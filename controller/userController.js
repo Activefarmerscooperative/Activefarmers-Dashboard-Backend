@@ -1,5 +1,10 @@
 const mongoose = require("mongoose");
 const { User } = require("../models/user");
+const SavingsCategory = require("../models/savingsCategory");
+const Savings = require("../models/savings");
+const SavingsWallet = require("../models/savingsWallet");
+const SavingsWithdrawal = require("../models/savingsWithdrawal")
+const Transaction = require("../models/transaction");
 const StatusCodes = require("../utils/status-codes")
 const { Otp_VerifyAccount, Otp_ForgotPassword } = require("../utils/sendMail")
 const _ = require("lodash");
@@ -10,7 +15,7 @@ const otpGenerator = require("otp-generator");
 const OTP = require("../models/OTP");
 var request = require('request');
 const generateUniqueId = require('generate-unique-id');
-const { initiatePaystackPayment, validatePaystackPayment } = require("../utils/paystack");
+const { initiatePaystackPayment, validatePaystackPayment, bankList} = require("../utils/paystack");
 
 const { accountSid, authToken, serviceID, TERMII_API_KEY, TERMII_SENDER_ID, TERMII_CONFIG_ID } = require('../config.js/keys')
 //Twilio client for sending phone number verification sms
@@ -132,7 +137,7 @@ exports.verify_token = async (req, res) => {
   if (!token) {
     return res.status(StatusCodes.UNPROCESSABLE_ENTITY).json({ error: `please enter the token sent to ${req.user.phone}` })
   }
-  console.log(token, req.user.phone)
+
   var data = {
     "pin_id": pin_id,
     "pin": token,
@@ -155,6 +160,30 @@ exports.verify_token = async (req, res) => {
   });
 
   if (result.verified === "True") {
+    const user = await User.findByIdAndUpdate(req.user._id, {
+      $set: {
+        regCompletePercent: 50,
+      }
+    }, { new: true })
+
+    // Create a savings wallet for the user.
+    const savingsCategories = await SavingsCategory.find().exec()
+    let categories = [];
+    for (let i = 0; i < savingsCategories.length; i++) {
+      categories.push({
+        category: savingsCategories[i]._id,
+        amount: 0,
+      })
+      savingsCategories[i]._id
+
+    }
+
+    const userSavingsWallet = new SavingsWallet({
+      _id: new mongoose.Types.ObjectId(),
+      user: user._id,
+      categories
+    })
+    await userSavingsWallet.save()
     return res.status(StatusCodes.OK).json({ message: 'User Registered successfully' })
   } else {
     res.status(StatusCodes.UNPROCESSABLE_ENTITY).json({ message: "Please enter a valid token" });
@@ -172,6 +201,26 @@ exports.loginUser = async (req, res) => {
   if (!validPassword) return res.status(400).send('Invalid email or password.');
 
   const token = user.generateAuthToken();
+
+  // // Create a savings wallet for the user.
+  // const savingsCategories = await SavingsCategory.find().exec()
+  // let categories = [];
+  // for (let i = 0; i < savingsCategories.length; i++) {
+  //   categories.push({
+  //     category: savingsCategories[i]._id,
+  //     amount: 0,
+  //   })
+  //   savingsCategories[i]._id
+
+  // }
+
+  // const userSavingsWallet = new SavingsWallet({
+  //   _id: new mongoose.Types.ObjectId(),
+  //   user: user._id,
+  //   categories
+  // })
+  // await userSavingsWallet.save()
+
   res.status(StatusCodes.OK).json({
     status: "Success",
     message: "User Login Successfull",
@@ -242,6 +291,16 @@ exports.guarantor_details = async (req, res) => {
   return res.status(StatusCodes.OK).json({
     status: "success",
     message: "Guarantor details updated successfully.",
+
+  });
+}
+
+exports.bank_list = async (req, res) => {
+
+  const { data } = await bankList();
+  return res.status(StatusCodes.OK).json({
+    status: "success",
+    banks:data
 
   });
 }
@@ -449,4 +508,323 @@ exports.update_user_profile_pic = async (req, res) => {
   }, { new: true })
   res.status(200).json({ message: "Profile Pic updated Successfully", profilePic: updatedUser.photo })
 
+}
+
+exports.get_savings_category = async (req, res) => {
+
+  const savingsCategory = await SavingsCategory.find().exec()
+  res.status(StatusCodes.OK).json({ message: "Success", savingsCategory })
+}
+
+exports.get_my_savings_wallet = async (req, res) => {
+
+  const savingsWallet = await SavingsWallet.find({
+    user: req.user._id
+  })
+    .populate({
+      path: 'categories.category',
+      model: 'SavingsCategory'
+    })
+    .exec()
+  res.status(StatusCodes.OK).json({ message: "Success", savingsWallet })
+}
+
+exports.add_savings = async (req, res) => {
+  const { _id, firstname, surname, email } = req.user
+  const { amount, category } = req.body
+  let name = `${firstname} ${surname}`
+
+  const savings = new Savings({
+    _id: new mongoose.Types.ObjectId(),
+    user: _id,
+    amount,
+    category
+  })
+
+
+  const { data } = await initiatePaystackPayment(amount, email, name, savings._id);
+
+  // If Paystack doesn't initiate payment stop the payment
+  if (!data) {
+    return res.status(StatusCodes.BAD_REQUEST).json({
+      status: 'failed',
+      message: 'Operation Failed',
+    });
+
+  }
+  await savings.save();
+
+  return res.status(StatusCodes.CREATED).json({
+    status: 'success',
+    message: 'Operation successful',
+    data
+
+  })
+}
+
+exports.validatePayment = async (req, res) => {
+
+  const data = await validatePaystackPayment(req.body.reference);
+  res.send(data.data.authorization)
+return
+  if (!data.status) return res.status(StatusCodes.BAD_REQUEST).json({ status: 'failed', error: data.message });
+
+  if (data.data.status !== 'success') return res.status(StatusCodes.BAD_REQUEST).json({ status: 'failed', error: 'Payment not completed' });
+
+  const amount_paid = data.data.amount / 100;
+
+  const savings = await Savings.findById(data.data.metadata.savings)
+    .exec();
+
+
+  // If this payment has already been verified maybe either by callbackUrl or webhook prevent re-run wen page is refreshed
+  if (savings.status === "Confirmed") {
+    return res.status(StatusCodes.OK).json({
+      status: 'success',
+      message: 'Your savings transaction was successful.',
+      order
+    });
+  }
+
+  //payment was successful, confirm the payment
+  //make sure the amount paid and order total amount corresponds
+  if (savings.amount !== amount_paid) return res.status(StatusCodes.BAD_REQUEST).json({ status: 'failed', error: 'Amount paid does not match amount recorded' });
+
+  savings.status = 'Confirmed'
+  // Each item in this order may belong to many sellers
+  // Update each item with the paymnt confirmation status.
+
+  let updateSavings = await SavingsWallet.findOne({ user: savings.user })
+
+  updateSavings.categories.map(item => {
+    if (item.category.toString() === savings.category.toString()) {
+      item.amount += savings.amount
+      return item
+    } else {
+      return item
+    }
+  })
+
+  const transaction = new Transaction({
+    _id: new mongoose.Types.ObjectId(),
+    type: 'savings',
+    amount: savings.amount,
+    payment_method: 'paystack',
+    reference: req.body.reference,
+    item: savings._id,
+    checkModel:"Savings"
+  })
+
+  await transaction.save();
+  await updateSavings.save();
+  await savings.save()
+
+  return res.status(StatusCodes.OK).json({
+    status: 'success',
+    message: 'Your Savings transaction was successful.'
+  });
+
+
+}
+exports.validatePaymentByWebhook = async (req, res, next) => {
+  try {
+    const hash = crypto.createHmac('sha512', process.env.PAYSTACK_SECRET_KEY).update(JSON.stringify(req.body)).digest('hex');
+
+    if (!req.headers['x-paystack-signature']) return res.status(StatusCodes.UNAUTHORIZED).json({ status: 'failed', error: 'Un-authorized operation' });
+
+    if (hash == req.headers['x-paystack-signature']) {
+      // Retrieve the request's body
+      const event = req.body;
+      if (event.event == 'charge.success') {
+        const data = await validatePaystackPayment(event.data.reference);
+
+        if (!data.status) return res.status(StatusCodes.BAD_REQUEST).json({ status: 'failed', error: data.message });
+
+        if (data.data.status !== 'success') return res.status(StatusCodes.BAD_REQUEST).json({ status: 'failed', error: 'Payment not completed' });
+
+        // const amount_paid = data.data.amount / 100;
+        const order = await Order.findById(data.data.metadata.order)
+          .populate({
+            path: 'address',
+            model: 'Address',
+            populate: [
+              {
+                path: 'state',
+                model: 'State',
+              },
+              {
+                path: 'country',
+                model: 'Country',
+              }]
+          })
+          .populate({
+            path: 'items',
+            model: 'OrderItem',
+            populate: {
+              path: 'product',
+              model: 'Product',
+              populate: [{
+                path: 'unit',
+                model: 'Unit',
+              },
+              {
+                path: 'state',
+                model: 'State',
+              },
+              {
+                path: 'country',
+                model: 'Country',
+              }]
+            }
+          })
+          .exec();
+
+        // If this payment has already been verified maybe either by callbackUrl or hook prevent re-run wen page is refreshed
+        if (order.completed === true) {
+          return res.sendStatus(200);
+        }
+        //payment was successful, confirm the order
+
+
+
+        // Each item in this order may belong to many sellers
+        // Update each item with the paymnt confirmation status.
+        await OrderItem.updateMany({ _id: { $in: order.items } },
+          {
+            $push: {
+              status: {
+                text: "Confirmed",
+              }
+            }
+          });
+
+        order.payment = true;
+        order.completed = true;
+        order.status = 'In Progress';
+        await order.save();
+
+        const transaction = new Transaction({
+          _id: new mongoose.Types.ObjectId(),
+          type: 'order',
+          amount: order.amount,
+          payment_method: 'paystack',
+          reference: data.data.reference,
+          item: order._id
+        })
+
+        await transaction.save();
+        const buyer = await User.findOne({ email: data.data.customer.email })
+
+        //empty cart
+        await Cart.deleteMany({ user: buyer._id }).exec();
+
+
+        // Send Email message to Buyer
+        await orderCompleted(buyer, order)
+        return res.sendStatus(200);
+
+
+      }
+
+    } else {
+
+      return res.status(StatusCodes.UNAUTHORIZED).json({ status: 'failed', error: 'Un-authorized operation' });
+    }
+    // res.send(200);
+  } catch (error) {
+    console.log(error)
+  }
+
+}
+
+exports.savings_withdrawal = async (req, res) => {
+  const { amount, category } = req.body;
+
+  // Get user wallet
+  const myWallet = await SavingsWallet.findOne({ user: req.user }).exec()
+  if (!myWallet) return res.status(StatusCodes.BAD_REQUEST).json({
+    status: "failed",
+    error: "Invalid Action",
+  });
+
+  const savingsCat = myWallet.categories.filter(item => item.category.toString() === category)
+
+  if (savingsCat.length === 0) return res.status(StatusCodes.BAD_REQUEST).json({
+    status: "failed",
+    error: "Invalid Transaction",
+  });
+
+  if (savingsCat[0].amount < amount) return res.status(StatusCodes.NOT_ACCEPTABLE).json({
+    status: "failed",
+    error: "You have Insufficient funds in the requested category",
+  });
+
+  let newWithdrawal = new SavingsWithdrawal({
+    _id:new mongoose.Types.ObjectId(),
+    amount,
+    category,
+    user: req.user._id
+  })
+
+  const transaction = new Transaction({
+    _id: new mongoose.Types.ObjectId(),
+    type: 'withdrawal',
+    amount: amount,
+    payment_method: 'paystack',
+    item: newWithdrawal._id,
+    checkModel:"SavingsWithdrawal"
+  })
+  await newWithdrawal.save()
+  await transaction.save();
+
+  return res.status(StatusCodes.OK).json({
+    status: 'success',
+    message: 'Your withdrawal request was successful and awaiting admin approval.'
+  });
+}
+
+exports.loan_request = async (req, res) => {
+  const { amount, repaymentMethod, repaymentPeriod } = req.body;
+
+  // Get user wallet
+  const myWallet = await SavingsWallet.findOne({ user: req.user }).exec()
+  if (!myWallet) return res.status(StatusCodes.BAD_REQUEST).json({
+    status: "failed",
+    error: "Please add funds to your savings account to be eligible for loans.",
+  });
+
+  const savingsCat = myWallet.categories.filter(item => item.category.toString() === category)
+
+  if (savingsCat.length === 0) return res.status(StatusCodes.BAD_REQUEST).json({
+    status: "failed",
+    error: "Invalid Transaction",
+  });
+
+  if (savingsCat[0].amount < amount) return res.status(StatusCodes.NOT_ACCEPTABLE).json({
+    status: "failed",
+    error: "You have Insufficient funds in the requested category",
+  });
+
+  let newWithdrawal = new SavingsWithdrawal({
+    _id:new mongoose.Types.ObjectId(),
+    amount,
+    category,
+    user: req.user._id
+  })
+
+  const transaction = new Transaction({
+    _id: new mongoose.Types.ObjectId(),
+    type: 'loan',
+    amount: amount,
+    payment_method: 'paystack',
+    item: newLoan._id,
+    checkModel:"Loan"
+  })
+  await newWithdrawal.save()
+  await transaction.save();
+
+  return res.status(StatusCodes.OK).json({
+    status: 'success',
+    message: 'Your withdrawal request was successful and awaiting admin approval.'
+  });
 }
