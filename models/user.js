@@ -30,18 +30,10 @@ const userSchema = new mongoose.Schema({
     maxlength: 20,
   },
   location: {
-    type: String,
-    required: true,
-    minlength: 5,
-    maxlength: 255,
-    unique: true
+    type: mongoose.Schema.Types.ObjectId, required: true, ref: 'State'
   },
   lga: {
-    type: String,
-    required: true,
-    minlength: 5,
-    maxlength: 255,
-    unique: true
+    type: mongoose.Schema.Types.ObjectId, required: true, ref: 'LGA',
   },
   address: {
     type: String,

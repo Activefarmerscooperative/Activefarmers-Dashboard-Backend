@@ -10,6 +10,7 @@ exports.initiatePaystackPayment = async (amount, email, name, savings) => {
     amount: amount * 100,
     email: email,
     name: name,
+    // channels:['card','bank'],
     metadata: {
       savings: savings
     }
@@ -91,3 +92,8 @@ exports.initiateTrans = async (amount, recipient_code, reason) => {
 
   return data;
 };
+
+exports.bankList = async () => {
+  const data = await paystack.misc.list_banks()
+  return data
+}

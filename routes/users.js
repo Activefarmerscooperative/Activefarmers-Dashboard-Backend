@@ -22,6 +22,10 @@ router.put('/farm_details', auth,validate(validateFarm), userController.farm_det
 
 router.put('/guarantor_details', auth,validate(validateGuarantor), userController.guarantor_details);
 
+router.get('/bank_list', auth, userController.bank_list);
+
+router.put('/bank_details', auth,validate(validateFarm), userController.farm_details);
+
 router.post('/login', validate(loginValidator), userController.loginUser);
 
 router.post('/forgot-pw', userController.forgot_password);
@@ -36,8 +40,18 @@ router.put('/change-pw', auth, userController.change_password);
 // Update users profile photo
 router.post('/update-user-photo',auth,upload.single('uploaded_file'),userController.update_user_profile_pic)
 
+router.get('/savings-category', auth, userController.get_savings_category);
 
+//My Savings Wallet 
+router.get('/savings-wallet', auth, userController.get_my_savings_wallet);
 
+router.post('/savings', auth, userController.add_savings);
+
+router.post('/savings/validate', auth, userController.validatePayment);
+
+router.post('/savings/withdrawal', auth, userController.savings_withdrawal);
+
+router.post('/savings/loan', auth, userController.loan_request);
 
 
 module.exports = router; 

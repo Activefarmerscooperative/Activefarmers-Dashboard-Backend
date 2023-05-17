@@ -1,19 +1,17 @@
 const { default: mongoose } = require("mongoose");
 
 const transactionSchema = mongoose.Schema({
-    _id: { type: mongoose.Schema.Types.ObjectId },
-    user: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'User' },
-    acton: { type: String, required: true },
-    amount: { type: String, required: true },
-    status: {
+    type: {type: String},
+    amount: {type: Number},
+    payment_method: {type: String},
+    reference: {type: String},
+    item: { type: mongoose.Schema.Types.ObjectId, required: true, refPath: 'checkModel' },
+    checkModel: {
         type: String,
-        enum: ['Pending', 'Confirmed'],
-        default: 'Pending'
+        enum: ['Savings','SavingsWithdrawal'],
+        // required: true,
     },
-    createdAt: {
-        type: Date,
-        default: Date.now
-    }
-});
+}, {timestamps: true});
 
-module.exports = mongoose.model('Transaction', transactionSchema);
+module.exports = new mongoose.model('Transaction', transactionSchema);
+
