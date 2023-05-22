@@ -21,7 +21,8 @@ const userSchema = new mongoose.Schema({
     required: true,
     minlength: 5,
     maxlength: 255,
-    unique: true
+    unique: true,
+    match: /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
   },
   gender: {
     type: String,
@@ -33,7 +34,7 @@ const userSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId, required: true, ref: 'State'
   },
   lga: {
-    type: mongoose.Schema.Types.ObjectId, required: true, ref: 'LGA',
+    type: mongoose.Schema.Types.ObjectId, required: false, ref: 'LGA',
   },
   address: {
     type: String,
@@ -62,12 +63,13 @@ const userSchema = new mongoose.Schema({
 
   membershipType: {
     type: String,
-    required: true
+    required: true,
+    enum: ["Farmer", "Non-Farmer"]
   },
   farm: {
     farmingExperience: {
       type: Number,
-      minlength: 2,
+      minlength: 0,
       maxlength: 150
     },
     farmSize: {
@@ -75,7 +77,7 @@ const userSchema = new mongoose.Schema({
     },
     cropTypes: {
       type: String,
-      minlength: 5,
+      minlength: 2,
       maxlength: 1024
     },
     farmAddress: {
@@ -106,6 +108,47 @@ const userSchema = new mongoose.Schema({
       type: String,
     }
   },
+  occupation:{
+    occupation: {
+      type: String,
+      minlength: 2,
+      maxlength: 150
+    },
+    salary: {
+      type: Number,
+    },
+    workLevel: {
+      type: String,
+      minlength: 5,
+      maxlength: 1024
+    },
+    companyName: {
+      type: String,
+    },
+
+  },
+  nextOfKin: {
+    full_name: {
+      type: String,
+      minlength: 2,
+      maxlength: 150
+    },
+    address: {
+      type: String,
+    },
+    email: {
+      type: String,
+      minlength: 5,
+      maxlength: 1024
+    },
+    phone: {
+      type: String,
+    },
+    relationship: {
+      type: String,
+    }
+  },
+
   isVerified: {
     type: Boolean,
     default: false
@@ -140,7 +183,10 @@ userSchema.methods.generateAuthToken = function () {
       firstname: this.firstname,
       surname: this.surname,
       email: this.email,
-      phone: this.phone
+      phone: this.phone,
+      membershipType:this.membershipType,
+      image:this.photo,
+      reference:this.reference
 
     },
     process.env.JWT,
@@ -173,10 +219,10 @@ function validateUser(user) {
       .message('Please enter a valid iso-code')
       .required(),
     email: Joi.string()
+      .email()
       .min(5)
       .max(255)
-      .required()
-      .email(),
+      .required(),
     gender: Joi.string()
       .min(3)
       .max(20)
@@ -186,7 +232,7 @@ function validateUser(user) {
       .required(),
     lga: Joi.string().regex(/^[0-9a-fA-F]{24}$/)
       .message('Please enter a valid LGA ID')
-      .required(),
+      .optional(),
     password: Joi.string()
       .min(5)
       .max(255)
@@ -197,7 +243,7 @@ function validateUser(user) {
       .required(),
     address: Joi.string()
       .min(5)
-      .max(10)
+      .max(255)
       .required()
 
   })
@@ -208,11 +254,11 @@ function validateFarm(farm) {
 
   const schema = Joi.object({
     farmingExperience: Joi.number()
-      .min(2)
+      .min(0)
       .max(150)
       .required(),
     farmSize: Joi.number()
-      .min(2)
+      .min(1)
       .max(1000)
       .required(),
     cropTypes: Joi.string()
