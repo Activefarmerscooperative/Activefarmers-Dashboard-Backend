@@ -6,7 +6,7 @@ const UserCard = require("../models/cardDetails");
 const SavingsWallet = require("../models/savingsWallet");
 const SavingsWithdrawal = require("../models/savingsWithdrawal")
 const Loan = require("../models/loan")
-const {BankDetails} = require("../models/bankDetails");
+const {BankDetails} = require("../models/accountDetails");
 const Transaction = require("../models/transaction");
 const StatusCodes = require("../utils/status-codes")
 const { Otp_VerifyAccount, Otp_ForgotPassword } = require("../utils/sendMail")
@@ -21,8 +21,8 @@ const generateUniqueId = require('generate-unique-id');
 const { initiatePaystackPayment, validatePaystackPayment, bankList, initiatePaystackCardValidation } = require("../utils/paystack");
 
 const { accountSid, authToken, serviceID, TERMII_API_KEY, TERMII_SENDER_ID, TERMII_CONFIG_ID } = require('../config.js/keys')
-//Twilio client for sending phone number verification sms
-const client = require('twilio')(accountSid, authToken);
+// //Twilio client for sending phone number verification sms
+// const client = require('twilio')(accountSid, authToken);
 
 exports.getUser = async (req, res) => {
   const user = await User.findById(req.user._id)
