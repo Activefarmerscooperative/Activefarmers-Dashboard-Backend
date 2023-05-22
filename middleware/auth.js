@@ -13,6 +13,6 @@ module.exports = function (req, res, next) {
         req.user = decoded;
         next();
     } catch (ex) {
-        res.status(StatusCodes.UNAUTHORIZED).send("Invalid token.");
+        res.status(StatusCodes.UNAUTHORIZED).json({error:"Invalid token."});
     }
 };
