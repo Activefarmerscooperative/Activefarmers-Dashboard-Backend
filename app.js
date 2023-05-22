@@ -1,9 +1,11 @@
 const winston = require("winston");
 const express = require("express");
+const morgan = require('morgan');
 const app = express();
 require('dotenv').config();
 
 require("./startup/logging")();
+app.use(morgan('tiny'));
 require("./startup/cors.js")(app);
 require("./startup/routes")(app);
 require("./startup/db")();

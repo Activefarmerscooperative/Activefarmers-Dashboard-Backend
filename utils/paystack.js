@@ -21,6 +21,24 @@ exports.initiatePaystackPayment = async (amount, email, name, savings) => {
   return data;
 };
 
+exports.initiatePaystackCardValidation = async (amount, email, name, savings) => {
+  const params = {
+    amount: amount * 100,
+    email: email,
+    name: name,
+    channels:['card'],
+    metadata: {
+      type:"Validate Card",
+      savings,
+      
+    }
+  };
+
+  const data = await paystack.transaction.initialize(params);
+
+  return data;
+};
+
 exports.validatePaystackPayment = async (reference) => {
   const data = await paystack.transaction.verify(reference);
 
