@@ -6,7 +6,7 @@ const { loginValidator, validate } = require("../middleware/validation");
 const { validateUser, validateFarm, validateGuarantor } = require("../models/user");
 const auth = require("../middleware/auth")
 const upload = require("../utils/multer");
-const { validateAccount } = require('../models/BankDetails');
+const { validateAccount } = require('../models/accountDetails');
 
 router.get('/', async (req, res) => {
     res.json('Hello! welcome to Active Farmers User');
