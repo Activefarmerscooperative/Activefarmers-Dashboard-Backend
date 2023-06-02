@@ -6,21 +6,20 @@ const UserCard = require("../models/cardDetails");
 const SavingsWallet = require("../models/savingsWallet");
 const SavingsWithdrawal = require("../models/savingsWithdrawal")
 const Loan = require("../models/loan")
-const {BankDetails} = require("../models/accountDetails");
+const { BankDetails } = require("../models/accountDetails");
 const Transaction = require("../models/transaction");
 const StatusCodes = require("../utils/status-codes")
 const { Otp_VerifyAccount, Otp_ForgotPassword } = require("../utils/sendMail")
 const _ = require("lodash");
 const bcrypt = require("bcrypt");
-const winston = require("winston");
 const sendMail = require("../utils/sendMail");
 const otpGenerator = require("otp-generator");
 const OTP = require("../models/OTP");
 var request = require('request');
 const generateUniqueId = require('generate-unique-id');
 const { initiatePaystackPayment, validatePaystackPayment, bankList, initiatePaystackCardValidation } = require("../utils/paystack");
-
-const { accountSid, authToken, serviceID, TERMII_API_KEY, TERMII_SENDER_ID, TERMII_CONFIG_ID } = require('../config.js/keys')
+const { Register_OTP, Veriify_OTP } = require("../utils/sendSMS")
+const { TERMII_API_KEY, TERMII_CONFIG_ID } = require('../config.js/keys')
 // //Twilio client for sending phone number verification sms
 // const client = require('twilio')(accountSid, authToken);
 
@@ -31,13 +30,27 @@ exports.getUser = async (req, res) => {
   res.status(StatusCodes.OK).json(user);
 }
 
+exports.getTransactions = async (req, res) => {
+  if (req.query.type === "All") {
+
+  }
+  const transactions = await Transaction.find({ user: req.user._id })
+    .populate("item")
+    .limit(10)
+    .sort({ createdAt: -1 })
+    .exec();
+  res.status(StatusCodes.OK).json(transactions);
+}
 
 exports.registerUser = async (req, res) => {
 
   let user = await User.findOne({
-    email: req.body.email
+    $or: [
+      { email: req.body.email },
+      { phone: req.body.phone }
+    ]
   });
-  if (user) return res.status(StatusCodes.BAD_REQUEST).send("User with this email is already registered.");
+  if (user) return res.status(StatusCodes.BAD_REQUEST).send("User with this email or Phone number is already registered.");
 
   //generate order id
   let userID = generateUniqueId({
@@ -64,69 +77,15 @@ exports.registerUser = async (req, res) => {
 
   const token = user.generateAuthToken();
 
-  // //send OTP for Email verification
-  // const code = otpGenerator.generate(6, {
-  //   lowerCaseAlphabets: false,
-  //   upperCaseAlphabets: false,
-  //   specialChars: false,
-  // });
+  const result = await Register_OTP(user.phone)
 
-  // const otp = new OTP({
-  //   _id: mongoose.Types.ObjectId(),
-  //   user: user._id,
-  //   code: code,
-  //   type: "Signup",
-  //   created_at: new Date(),
-  // });
-  // await otp.save();
-  // await Otp_VerifyAccount(user.email, user.full_name, code);
-
-  //Use Twilio client to send verification sms
-  // const phoneVerification = await client.verify
-  //   .services(serviceID)
-  //   .verifications
-  //   .create({
-  //     to: user.phone,
-  //     channel: 'sms'
-  //   })
-
-
-
-  var data = {
-    "to": 2348069200188,
-    "message_type": "NUMERIC",
-    "from": TERMII_SENDER_ID,
-    "channel": "generic",
-    "pin_attempts": 10,
-    "pin_time_to_live": 5,
-    "pin_length": 6,
-    "pin_placeholder": "< 1234 >",
-    "message_text": "Your AFCS Verification pin is < 1234 >",
-    "pin_type": "NUMERIC",
-    "api_key": TERMII_API_KEY,
-  };
-  var options = {
-    'method': 'POST',
-    'url': "https://api.ng.termii.com/api/sms/otp/send",
-    'headers': {
-      'Content-Type': ['application/json', 'application/json']
-    },
-    body: JSON.stringify(data)
-
-  };
-  let result;
-  // request(options, function (error, response) {
-  //   if (error) throw new Error(error);
-  //   console.log(response.body)
-  //   result = response.body
-  // });
 
   res
     .header("afcs-auth-token", token)
     .status(StatusCodes.OK).json({
       status: "success",
       message: `Enter the verification code sent to ${user.phone} in order to verify your account`,
-      result,
+      pinId: result?.pinId || null,
       afcsToken: token
       //Result is the response from the OTP SERVICE. 
       // Sample Data. Note pinId is required to verify OTP
@@ -142,37 +101,18 @@ exports.registerUser = async (req, res) => {
 //Verify token entered by user.
 exports.verify_token = async (req, res) => {
 
-  const { token, pin_id } = req.body
-
-  if (!token) {
+  const { token, pinId } = req.body
+  if (!token || !pinId) {
     return res.status(StatusCodes.UNPROCESSABLE_ENTITY).json({ error: `please enter the token sent to ${req.user.phone}` })
   }
 
-  var data = {
-    "pin_id": pin_id,
-    "pin": token,
-    "api_key": TERMII_API_KEY,
-  };
-  var options = {
-    'method': 'POST',
-    'url': "https://api.ng.termii.com/api/sms/otp/verify",
-    'headers': {
-      'Content-Type': ['application/json', 'application/json']
-    },
-    body: JSON.stringify(data)
+  const result = await Veriify_OTP(token, pinId)
 
-  };
-  let result;
-  request(options, function (error, response) {
-    if (error) throw new Error(error);
-    console.log(response.body);
-    result = response.body
-  });
-
-  if (result.verified === "True") {
+  if (result?.verified === true) {
     const user = await User.findByIdAndUpdate(req.user._id, {
       $set: {
         regCompletePercent: 50,
+        isVerified: true
       }
     }, { new: true })
 
@@ -195,6 +135,8 @@ exports.verify_token = async (req, res) => {
     })
     await userSavingsWallet.save()
     return res.status(StatusCodes.OK).json({ message: 'User Registered successfully' })
+  } else if (result?.verified === "Expired") {
+    res.status(StatusCodes.UNPROCESSABLE_ENTITY).json({ message: "token Expired." });
   } else {
     res.status(StatusCodes.UNPROCESSABLE_ENTITY).json({ message: "Please enter a valid token" });
   }
@@ -209,13 +151,13 @@ exports.confirmAFCSToken = async (req, res) => {
 }
 
 exports.loginUser = async (req, res) => {
-  let user = await User.findOne({ email: req.body.email });
-  if (!user) return res.status(400).json({ error: 'Invalid email or password.' });
+  let user = await User.findOne({ phone: req.body.phone });
+  if (!user) return res.status(400).json({ error: 'Invalid Credentials.' });
 
   if (!user.isVerified) return res.status(400).json({ error: 'Please contact AFCS admin to verify your account.' });
 
   const validPassword = await bcrypt.compare(req.body.password, user.password);
-  if (!validPassword) return res.status(400).json({ error: 'Invalid email or password.' });
+  if (!validPassword) return res.status(400).json({ error: 'Invalid credentials' });
 
   const token = user.generateAuthToken();
 
@@ -242,7 +184,6 @@ exports.loginUser = async (req, res) => {
     status: "Success",
     message: "User Login Successfull",
     token,
-    user: _.pick(user, ["email", "surname", "firstname"])
   }
 
   );
@@ -273,6 +214,27 @@ exports.resend_otp = async (req, res) => {
 
 }
 
+exports.personal_details = async (req, res) => {
+  await User.findByIdAndUpdate(req.user._id, {
+    $set: {
+      surname: req.body.surname,
+      firstname: req.body.firstname,
+      email: req.body.email,
+      gender: req.body.gender,
+      DOB: req.body.DOB,
+      location: req.body.location,
+      address: req.body.address
+
+    }
+  }, { new: true })
+
+  return res.status(StatusCodes.OK).json({
+    status: "success",
+    message: "User details updated successfully.",
+
+  });
+}
+
 
 exports.farm_details = async (req, res) => {
   const user = await User.findByIdAndUpdate(req.user._id, {
@@ -293,7 +255,10 @@ exports.farm_details = async (req, res) => {
 }
 
 exports.guarantor_details = async (req, res) => {
-  const user = await User.findByIdAndUpdate(req.user._id, {
+
+  const hasLoan = await Loan.findOne({ user: req.user, repaymentStatus: { $ne: "Completed" } })
+  if (hasLoan) return res.status(StatusCodes.BAD_REQUEST).send("Unauthorized Action. Please clear up your pending loan before you can update your guaranto info.");
+  await User.findByIdAndUpdate(req.user._id, {
     $set: {
       regCompletePercent: 100,
       "guarantor.full_name": req.body.full_name,
@@ -312,12 +277,42 @@ exports.guarantor_details = async (req, res) => {
   });
 }
 
+exports.occupation_details = async (req, res) => {
+  let option = req.body
+  await User.findByIdAndUpdate(req.user._id, {
+    $set: {
+      occupation: option,
+    }
+  }, { new: true })
+
+  return res.status(StatusCodes.OK).json({
+    status: "success",
+    message: "User details updated successfully.",
+
+  });
+}
+
+exports.nextOfKin_details = async (req, res) => {
+  let option = req.body
+  await User.findByIdAndUpdate(req.user._id, {
+    $set: {
+      nextOfKin: option,
+    }
+  }, { new: true })
+
+  return res.status(StatusCodes.OK).json({
+    status: "success",
+    message: "Next of Kin details updated successfully.",
+
+  });
+}
+
 exports.bank_details = async (req, res) => {
 
-  const {accountNumber,bankCode, accountName, bankName, accountType} = req.body
-   await BankDetails.findByIdAndUpdate(req.user._id, {
+  const { accountNumber, bankCode, accountName, bankName, accountType } = req.body
+  await BankDetails.findByIdAndUpdate(req.user._id, {
     $set: {
-      user:req.user._id,    
+      user: req.user._id,
       accountNumber,
       bankCode,
       accountName,
@@ -325,7 +320,7 @@ exports.bank_details = async (req, res) => {
       accountType
 
     }
-  }, { new: true,upsert: true })
+  }, { new: true, upsert: true })
 
   return res.status(StatusCodes.OK).json({
     status: "success",
@@ -577,7 +572,7 @@ exports.get_savings_category = async (req, res) => {
 
 exports.get_my_savings_wallet = async (req, res) => {
 
-  const savingsWallet = await SavingsWallet.find({
+  const savingsWallet = await SavingsWallet.findOne({
     user: req.user._id
   })
     .populate({
@@ -638,7 +633,7 @@ exports.add_savings = async (req, res) => {
 
   return res.status(StatusCodes.CREATED).json({
     status: 'success',
-    message: 'Operation successful',
+    message: 'Operation successful.',
     data
 
   })
@@ -745,7 +740,6 @@ exports.validatePayment = async (req, res) => {
     status: 'success',
     message: 'Your Savings transaction was successful.'
   });
-
 
 }
 exports.validatePaymentByWebhook = async (req, res, next) => {
@@ -960,7 +954,7 @@ exports.loan_request = async (req, res) => {
   const monthsDiff = timeDiff / (1000 * 60 * 60 * 24 * 30); // Assuming 30 days per month
 
   // Check if the difference is less than two months
-  const isLessThanTwoMonths = monthsDiff < 2;
+  const isLessThanTwoMonths = monthsDiff < 0;
 
   if (isLessThanTwoMonths) return res.status(StatusCodes.BAD_REQUEST).json({
     status: "failed",
