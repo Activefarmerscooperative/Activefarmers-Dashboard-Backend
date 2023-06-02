@@ -30,6 +30,9 @@ const userSchema = new mongoose.Schema({
     minlength: 3,
     maxlength: 20,
   },
+  DOB: {
+    type: String
+  },
   location: {
     type: mongoose.Schema.Types.ObjectId, required: true, ref: 'State'
   },
@@ -108,7 +111,7 @@ const userSchema = new mongoose.Schema({
       type: String,
     }
   },
-  occupation:{
+  occupation: {
     occupation: {
       type: String,
       minlength: 2,
@@ -184,9 +187,9 @@ userSchema.methods.generateAuthToken = function () {
       surname: this.surname,
       email: this.email,
       phone: this.phone,
-      membershipType:this.membershipType,
-      image:this.photo,
-      reference:this.reference
+      membershipType: this.membershipType,
+      image: this.photo,
+      reference: this.reference
 
     },
     process.env.JWT,
@@ -249,7 +252,46 @@ function validateUser(user) {
   })
   return schema.validate(user);
 }
+function validateUserUpdate(user) {
 
+  const schema = Joi.object({
+    firstname: Joi.string()
+      .min(2)
+      .max(250)
+      .required(),
+    surname: Joi.string()
+      .min(2)
+      .max(250)
+      .required(),
+    phone: Joi.string()
+      .pattern(new RegExp(/[1-9]\d{1,14}$/))
+      .message('Please enter a valid phone number in international format')
+      .required(),
+    email: Joi.string()
+      .email()
+      .min(5)
+      .max(255)
+      .required(),
+    gender: Joi.string()
+      .min(3)
+      .max(20)
+      .required(),
+    location: Joi.string().regex(/^[0-9a-fA-F]{24}$/)
+      .message('Please enter a valid State ID')
+      .required(),
+
+    DOB: Joi.string()
+      .min(1)
+      .max(255)
+      .required(),
+    address: Joi.string()
+      .min(5)
+      .max(255)
+      .required()
+
+  })
+  return schema.validate(user);
+}
 function validateFarm(farm) {
 
   const schema = Joi.object({
@@ -308,7 +350,58 @@ function validateGuarantor(guarantor) {
   })
   return schema.validate(guarantor);
 }
+function validateUserOccupation(user) {
+
+  const schema = Joi.object({
+    occupation: Joi.string()
+      .min(1)
+      .max(250)
+      .required(),
+    salary: Joi.number()
+      .min(0)
+      .required(),
+    workLevel: Joi.string()
+      .min(0)
+      .required(),
+    companyName: Joi.string()
+      .min(5)
+      .max(255)
+      .required(),
+
+  })
+  return schema.validate(user);
+}
+
+function validateNextOfKin(user) {
+
+  const schema = Joi.object({
+    full_name: Joi.string()
+      .min(1)
+      .max(250)
+      .required(),
+    address: Joi.string()
+      .min(1)
+      .max(250)
+      .required(),
+    email: Joi.string()
+      .min(5)
+      .max(255)
+      .optional()
+      .email(),
+    phone: Joi.string()
+      .min(5)
+      .max(255)
+      .required(),
+    relationship: Joi.string()
+      .min(0)
+      .required(),
+  })
+  return schema.validate(user);
+}
 exports.User = User;
 exports.validateUser = validateUser;
+exports.validateUserUpdate = validateUserUpdate;
 exports.validateFarm = validateFarm;
 exports.validateGuarantor = validateGuarantor;
+exports.validateUserOccupation = validateUserOccupation;
+exports.validateNextOfKin = validateNextOfKin;

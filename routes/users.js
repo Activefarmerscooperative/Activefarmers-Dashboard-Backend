@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 const userController = require("../controller/userController")
 const { loginValidator, validate } = require("../middleware/validation");
-const { validateUser, validateFarm, validateGuarantor } = require("../models/user");
+const { validateUser,validateUserUpdate, validateFarm, validateGuarantor, validateUserOccupation, validateNextOfKin } = require("../models/user");
 const auth = require("../middleware/auth")
 const upload = require("../utils/multer");
 const { validateAccount } = require('../models/accountDetails');
@@ -14,6 +14,9 @@ router.get('/', async (req, res) => {
 
 //  Get the current user.
 router.get('/me',auth, userController.getUser)
+
+//  Get the current user Transactions.
+router.get('/transactions',auth, userController.getTransactions)
 
 //  Get the user bank details.
 router.get('/bank-details',auth, userController.get_bank_details)
@@ -31,9 +34,15 @@ router.post('/resend-verification', auth, userController.resend_otp)
 
 router.get('/token', auth, userController.confirmAFCSToken);
 
+router.put('/personal_details', auth, validate(validateUserUpdate), userController.personal_details);
+
 router.put('/farm_details', auth, validate(validateFarm), userController.farm_details);
 
 router.put('/guarantor_details', auth, validate(validateGuarantor), userController.guarantor_details);
+
+router.put('/occupation_details', auth,validate(validateUserOccupation), userController.occupation_details);
+
+router.put('/nextOfKin_details', auth,validate(validateNextOfKin), userController.nextOfKin_details);
 
 router.get('/bank_list', auth, userController.bank_list);
 
