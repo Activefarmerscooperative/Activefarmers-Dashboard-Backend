@@ -50,30 +50,32 @@ exports.registerUser = async (req, res) => {
       { phone: req.body.phone }
     ]
   });
-  if (user) return res.status(StatusCodes.BAD_REQUEST).send("User with this email or Phone number is already registered.");
 
-  //generate order id
-  let userID = generateUniqueId({
-    length: 10,
-    useLetters: false
-  });
-
-  //make sure the order id is unique
-  let id_check = await User.findOne({ reference: userID }).exec();
-  while (id_check !== null) {
-    userID = generateUniqueId({
+  if (user && user.isVerified) return res.status(StatusCodes.BAD_REQUEST).send("User with this email or Phone number is already registered.");;
+  if (!user) {
+    //generate order id
+    let userID = generateUniqueId({
       length: 10,
       useLetters: false
     });
 
-    id_check = await User.findOne({ reference: userID }).exec();
-  }
-  req.body.reference = userID
+    //make sure the order id is unique
+    let id_check = await User.findOne({ reference: userID }).exec();
+    while (id_check !== null) {
+      userID = generateUniqueId({
+        length: 10,
+        useLetters: false
+      });
 
-  user = new User(_.pick(req.body, ["surname", "firstname", "reference", "email", "phone", "isoCode", "gender", "location", "lga", "address", "password", "membershipType"]));
-  const salt = await bcrypt.genSalt(10);
-  user.password = await bcrypt.hash(user.password, salt);
-  user = await user.save();
+      id_check = await User.findOne({ reference: userID }).exec();
+    }
+    req.body.reference = userID
+
+    user = new User(_.pick(req.body, ["surname", "firstname", "reference", "email", "phone", "isoCode", "gender", "location", "lga", "address", "password", "membershipType"]));
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(user.password, salt);
+    user = await user.save();
+  }
 
   const token = user.generateAuthToken();
 
