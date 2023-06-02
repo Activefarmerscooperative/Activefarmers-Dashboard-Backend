@@ -1,6 +1,6 @@
-// const winston = require("winston");
-const express = require("express");
 const morgan = require('morgan');
+const winston = require("winston");
+const express = require("express");
 const app = express();
 require('dotenv').config();
 
@@ -14,8 +14,7 @@ require("./startup/db")();
 
 const port = process.env.PORT;
 const server = app.listen(port, () =>
-  // winston.info(`Listening on port ${port}...`)
-  console.log(`Listening on port ${port}...`)
+  winston.info(`Listening on port ${port}...`)
 );
 
 module.exports = server;
