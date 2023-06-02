@@ -924,6 +924,7 @@ exports.loan_request = async (req, res) => {
 
   // If d user has a pending or unrepaid loan he cant apply for another
   const hasLoan = await Loan.find({
+    user: req.user._id,
     $or: [
       { status: 'Pending' },
       { repaymentStatus: { $in: ['Ongoing', 'Failed'] } }
@@ -954,7 +955,7 @@ exports.loan_request = async (req, res) => {
   const monthsDiff = timeDiff / (1000 * 60 * 60 * 24 * 30); // Assuming 30 days per month
 
   // Check if the difference is less than two months
-  const isLessThanTwoMonths = monthsDiff < 0;
+  const isLessThanTwoMonths = monthsDiff < 2;
 
   if (isLessThanTwoMonths) return res.status(StatusCodes.BAD_REQUEST).json({
     status: "failed",
