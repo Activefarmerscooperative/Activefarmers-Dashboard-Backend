@@ -1,5 +1,8 @@
 {
   "name": "Active Farmers Cooperative",
+  "engines": {
+    "node": ">=16"
+  },
   "version": "1.0.0",
   "description": "",
   "main": "app.js",
