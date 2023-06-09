@@ -17,11 +17,9 @@ const otpGenerator = require("otp-generator");
 const OTP = require("../models/OTP");
 var request = require('request');
 const generateUniqueId = require('generate-unique-id');
-const { initiatePaystackPayment, validatePaystackPayment, bankList, initiatePaystackCardValidation } = require("../utils/paystack");
+const { initiatePaystackPayment, validatePaystackPayment, charge_authorization, bankList, initiatePaystackCardValidation } = require("../utils/paystack");
 const { Register_OTP, Veriify_OTP } = require("../utils/sendSMS")
-const { TERMII_API_KEY, TERMII_CONFIG_ID } = require('../config.js/keys')
-// //Twilio client for sending phone number verification sms
-// const client = require('twilio')(accountSid, authToken);
+const { Card_Is_Valid } = require("../utils/checkValidCard")
 
 exports.getUser = async (req, res) => {
   const user = await User.findById(req.user._id)
@@ -31,14 +29,20 @@ exports.getUser = async (req, res) => {
 }
 
 exports.getTransactions = async (req, res) => {
+  let transactions;
   if (req.query.type === "All") {
-
+    transactions = await Transaction.find({ user: req.user._id })
+      .populate("item")
+      .sort({ createdAt: -1 })
+      .exec();
+  } else {
+    transactions = await Transaction.find({ user: req.user._id })
+      .populate("item")
+      .limit(10)
+      .sort({ createdAt: -1 })
+      .exec();
   }
-  const transactions = await Transaction.find({ user: req.user._id })
-    .populate("item")
-    .limit(10)
-    .sort({ createdAt: -1 })
-    .exec();
+
   res.status(StatusCodes.OK).json(transactions);
 }
 
@@ -236,7 +240,6 @@ exports.personal_details = async (req, res) => {
 
   });
 }
-
 
 exports.farm_details = async (req, res) => {
   const user = await User.findByIdAndUpdate(req.user._id, {
@@ -707,10 +710,8 @@ exports.validatePayment = async (req, res) => {
 
   if (data.data.metadata?.type === "Validate Card") {
     // Check if Card is Valid for Loan period
-    const currentDate = new Date();
-    const currentYear = currentDate.getFullYear();
-
-    if (!data.data.authorization.reusable || data.data.authorization.exp_year < currentYear + 1) {
+    const cardIsValid = Card_Is_Valid(data.data)
+    if (!data.data.authorization.reusable || !cardIsValid) {
       return res.status(StatusCodes.BAD_REQUEST).json({
         status: 'success',
         message: 'Your Card Does not meet the minimum required criteria please try another card.'
@@ -744,6 +745,7 @@ exports.validatePayment = async (req, res) => {
   });
 
 }
+
 exports.validatePaymentByWebhook = async (req, res, next) => {
   try {
     const hash = crypto.createHmac('sha512', process.env.PAYSTACK_SECRET_KEY).update(JSON.stringify(req.body)).digest('hex');
@@ -923,7 +925,6 @@ exports.savings_withdrawal = async (req, res) => {
 exports.loan_request = async (req, res) => {
 
   const { amount, repaymentMethod, repaymentPeriod } = req.body;
-
   // If d user has a pending or unrepaid loan he cant apply for another
   const hasLoan = await Loan.find({
     user: req.user._id,
@@ -932,6 +933,7 @@ exports.loan_request = async (req, res) => {
       { repaymentStatus: { $in: ['Ongoing', 'Failed'] } }
     ]
   }).exec()
+
   if (hasLoan.length > 0) return res.status(StatusCodes.BAD_REQUEST).json({
     status: "failed",
     error: "Sorry you are not eligible for another loan. You either have a pending or an unpaid loan.",
@@ -957,7 +959,7 @@ exports.loan_request = async (req, res) => {
   const monthsDiff = timeDiff / (1000 * 60 * 60 * 24 * 30); // Assuming 30 days per month
 
   // Check if the difference is less than two months
-  const isLessThanTwoMonths = monthsDiff < 2;
+  const isLessThanTwoMonths = monthsDiff < 0;
 
   if (isLessThanTwoMonths) return res.status(StatusCodes.BAD_REQUEST).json({
     status: "failed",
@@ -1030,18 +1032,28 @@ exports.loan_request = async (req, res) => {
     }
 
     // Check if Card is Valid for Loan period
-    const currentDate = new Date();
-    const currentYear = currentDate.getFullYear();
+    const cardIsValid = Card_Is_Valid(findCard)
 
-    if (!findCard.authorization.reusable || findCard.authorization.exp_year < currentYear + 1) {
+    if (!findCard.authorization.reusable || !cardIsValid) {
       await newLoan.save()
       await transaction.save();
       return res.status(StatusCodes.BAD_REQUEST).json({
         status: 'success',
-        message: 'Your Card Does not meet the minimum required criteria please try another card.'
+        message: 'Your Saved Card Does not meet the minimum required criteria please try another card.'
       });
     }
-    newLoan.cardIsValid = true;
+
+    let last4 = findCard.authorization.last4,
+      bank = findCard.authorization.bank,
+      brand = findCard.authorization.brand
+
+    // newLoan.cardIsValid = true;
+    await newLoan.save()
+    await transaction.save();
+    return res.status(StatusCodes.TEMPORARY_REDIRECT).json({
+      status: 'validate_card',
+      message: `To complete your Loan request, please confirm validity of your ${bank} ${brand} card number **** **** ${last4}.`,
+    });
 
   }
 
@@ -1118,3 +1130,131 @@ exports.validate_user_card = async (req, res) => {
   })
 }
 
+exports.validate_saved_card = async (req, res) => {
+
+  const { _id } = req.user
+  const amount = 50
+
+  // Check if this is the first savings
+  // First savings cannot be less dan ₦5000
+  const isFirstSavings = await Savings.find({ user: _id }).exec()
+  if (isFirstSavings.length < 1 && amount < 5000) return res.status(StatusCodes.BAD_REQUEST).json({
+    status: 'failed',
+    message: 'Your first saving cannot be less than ₦5000.',
+  });
+
+  // fetch the User card
+  const findCard = await UserCard.findOne({ user: req.user._id })
+  if (!findCard) {
+    return res.status(StatusCodes.PERMANENT_REDIRECT).json({
+      status: 'success',
+      message: 'To complete your Loan request please enter a valid Debit card.'
+    });
+  }
+
+  // Charge the user Card
+  let authorization_code = findCard.authorization.authorization_code
+  let email = findCard.email
+
+  const { data } = await charge_authorization(amount, email, authorization_code);
+
+  // If Paystack doesn't initiate payment stop the payment
+  if (!data || data.status !== "success") return res.status(StatusCodes.BAD_REQUEST).json({
+    status: 'failed',
+    message: 'Operation Failed',
+  });
+
+  //generate reference id
+  let refID = generateUniqueId({
+    length: 15,
+    useLetters: false
+  });
+
+  //make sure the savings reference id is unique
+  let id_check = await Savings.findOne({ reference: refID }).exec();
+  while (id_check !== null) {
+    refID = generateUniqueId({
+      length: 15,
+      useLetters: false
+    });
+
+    id_check = await Savings.findOne({ reference: refID }).exec();
+  }
+  const savingsCategory = await SavingsCategory.findOne({ name: "Regular" }).exec()
+  const savings = new Savings({
+    _id: new mongoose.Types.ObjectId(),
+    user: _id,
+    amount,
+    category: savingsCategory._id,
+    reference: refID
+  })
+
+  // Add amount to user Regular savings wallet.
+  let updateSavings = await SavingsWallet.findOne({ user: _id })
+
+  updateSavings.categories.map(item => {
+    if (item.category.toString() === savingsCategory._id.toString()) {
+
+      item.amount += amount
+      return item
+    } else {
+      return item
+    }
+  })
+
+  // Create a transaction.
+  const transaction = new Transaction({
+    _id: new mongoose.Types.ObjectId(),
+    type: 'savings',
+    user: _id,
+    amount: amount,
+    payment_method: 'paystack',
+    reference: data.reference,
+    item: savings._id,
+    checkModel: "Savings"
+  })
+
+  await transaction.save();
+  await updateSavings.save();
+  await savings.save()
+
+  await Loan.findOneAndUpdate({ user: _id, status: "Pending" }, {
+    $set: {
+      cardIsValid: true
+    }
+  }, {
+    new: true
+  })
+
+  return res.status(StatusCodes.CREATED).json({
+    status: 'success',
+    message: 'Operation successful',
+  })
+}
+
+exports.cancel_loan_request = async (req, res) => {
+
+  const hasLoan = await Loan.findOne({ status: 'Pending', }).exec()
+  if (!hasLoan) return res.status(StatusCodes.UNAUTHORIZED).json({
+    status: "failed",
+    error: "Sorry you are not authorized to carry out this action.",
+  });
+
+  hasLoan.status = "Cancelled"
+  await hasLoan.save()
+  return res.status(StatusCodes.OK).json({
+    status: "success",
+    message: "Loan request cancelled successfully..",
+  });
+
+}
+
+exports.my_loan = async (req, res) => {
+  const hasLoan = await Loan.findOne({ status: 'Pending', }).exec()
+
+  return res.status(StatusCodes.OK).json({
+    status: "success",
+    myLoan:hasLoan
+  });
+
+}

@@ -8,7 +8,7 @@ const loanSchema = mongoose.Schema({
     // category: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'SavingsCategory' },
     status: {
         type: String,
-        enum: ['Pending', 'Confirmed', "Rejected"],
+        enum: ['Pending', 'Confirmed', "Rejected", "Cancelled"],//User can cancel loan before it's approved.
         default: 'Pending'
     },
     repaymentMethod:{

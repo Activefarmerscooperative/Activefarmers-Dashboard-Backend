@@ -39,6 +39,18 @@ exports.initiatePaystackCardValidation = async (amount, email, name, savings) =>
   return data;
 };
 
+//Charge a user saved card.
+exports.charge_authorization = async (amount, email, authorization_code) => {
+  const params = {
+    amount: amount,
+    email: email,
+    authorization_code
+  };
+
+  const data = await paystack.transaction.charge(params);
+
+  return data;
+};
 exports.validatePaystackPayment = async (reference) => {
   const data = await paystack.transaction.verify(reference);
 
