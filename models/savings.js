@@ -5,7 +5,7 @@ const savingsSchema = mongoose.Schema({
     reference: { type: String, required: true, unique: true },
     user: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'User' },
     amount: { type: Number, required: true },
-    category: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'SavingsCategory' },
+    category: { type: String, required: true },
     status: {
         type: String,
         enum: ['Pending', 'Confirmed'],

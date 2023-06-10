@@ -127,11 +127,9 @@ exports.verify_token = async (req, res) => {
     let categories = [];
     for (let i = 0; i < savingsCategories.length; i++) {
       categories.push({
-        category: savingsCategories[i]._id,
+        category: savingsCategories[i].name,
         amount: 0,
       })
-      savingsCategories[i]._id
-
     }
 
     const userSavingsWallet = new SavingsWallet({
@@ -166,25 +164,6 @@ exports.loginUser = async (req, res) => {
   if (!validPassword) return res.status(400).json({ error: 'Invalid credentials' });
 
   const token = user.generateAuthToken();
-
-  // // Create a savings wallet for the user.
-  // const savingsCategories = await SavingsCategory.find().exec()
-  // let categories = [];
-  // for (let i = 0; i < savingsCategories.length; i++) {
-  //   categories.push({
-  //     category: savingsCategories[i]._id,
-  //     amount: 0,
-  //   })
-  //   savingsCategories[i]._id
-
-  // }
-
-  // const userSavingsWallet = new SavingsWallet({
-  //   _id: new mongoose.Types.ObjectId(),
-  //   user: user._id,
-  //   categories
-  // })
-  // await userSavingsWallet.save()
 
   res.status(StatusCodes.OK).json({
     status: "Success",
@@ -580,22 +559,22 @@ exports.get_my_savings_wallet = async (req, res) => {
   const savingsWallet = await SavingsWallet.findOne({
     user: req.user._id
   })
-    .populate({
-      path: 'categories.category',
-      model: 'SavingsCategory'
-    })
     .exec()
   res.status(StatusCodes.OK).json({ message: "Success", savingsWallet })
 }
 
 exports.add_savings = async (req, res) => {
   const { _id, firstname, surname, email } = req.user
-  const { amount, category } = req.body
+  const { amount, category, newCategory } = req.body
+
+  const capitalizeFirstLetter = string => `${string.charAt(0).toUpperCase()}${string.slice(1)}`;
+
+
   let name = `${firstname} ${surname}`
 
   // Check if this is the first savings
   // First savings cannot be less dan ₦5000
-  const isFirstSavings = await Savings.find({ user: _id }).exec()
+  const isFirstSavings = await Savings.find({ user: _id,status:"Confirmed" }).exec()
   if (isFirstSavings.length < 1 && amount < 5000) return res.status(StatusCodes.BAD_REQUEST).json({
     status: 'failed',
     message: 'Your first saving cannot be less than ₦5000.',
@@ -622,10 +601,31 @@ exports.add_savings = async (req, res) => {
     _id: new mongoose.Types.ObjectId(),
     user: _id,
     amount,
-    category,
+    category: newCategory ? capitalizeFirstLetter(newCategory) : category,
     reference: refID
   })
+  // Add new Savings category
+  if (newCategory) {
+    //Make first letter of newCategory uppercase
+    let addCategory = capitalizeFirstLetter(newCategory)
+    const savingsWallet = await SavingsWallet.findOne({ user: req.user._id }).exec()
+    const categoryExist = savingsWallet.categories.filter(item => item.category === addCategory)
 
+    // If this category name already exist return error
+    if (categoryExist.length > 0) {
+      return res.status(StatusCodes.BAD_REQUEST).json({
+        status: 'failed',
+        message: `Saving category name "${addCategory}" already exist.`,
+      });
+    } else {
+      //Category name does not exist create it.
+      savingsWallet.categories.push({
+        category: addCategory,
+        amount: 0,
+      })
+      await savingsWallet.save()
+    }
+  }
 
   const { data } = await initiatePaystackPayment(amount, email, name, savings._id);
 
@@ -685,7 +685,7 @@ exports.validatePayment = async (req, res) => {
   let updateSavings = await SavingsWallet.findOne({ user: savings.user })
 
   updateSavings.categories.map(item => {
-    if (item.category.toString() === savings.category.toString()) {
+    if (item.category === savings.category) {
       item.amount += savings.amount
       return item
     } else {
@@ -1254,7 +1254,7 @@ exports.my_loan = async (req, res) => {
 
   return res.status(StatusCodes.OK).json({
     status: "success",
-    myLoan:hasLoan
+    myLoan: hasLoan
   });
 
 }

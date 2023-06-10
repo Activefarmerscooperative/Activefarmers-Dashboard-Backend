@@ -5,7 +5,7 @@ const savingsWalletSchema = mongoose.Schema({
     user: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'User' },
     categories: [{
         category: {
-            type: mongoose.Schema.Types.ObjectId, required: true, ref: 'SavingsCategory'
+            type: String, required: true,
         },
         amount: {
             type: Number,
