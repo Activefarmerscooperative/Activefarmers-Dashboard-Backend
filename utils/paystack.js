@@ -71,7 +71,6 @@ exports.initiatePaystackWithdrawal = async (
     recipient: recipient,
   };
 
-  console.log(params);
   const data = await paystack.transfer.create(params);
 
   return data;
@@ -79,7 +78,7 @@ exports.initiatePaystackWithdrawal = async (
 
 exports.verifyAccount = async (account_number, bank_code) => {
 
-
+try {
   const params = {
     account_number,
     bank_code
@@ -88,6 +87,10 @@ exports.verifyAccount = async (account_number, bank_code) => {
   // console.log({params:data});
 
   return data;
+} catch (error) {
+  return error.error
+}
+
 };
 
 

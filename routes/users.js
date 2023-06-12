@@ -69,8 +69,6 @@ router.get('/savings-wallet', auth, userController.get_my_savings_wallet);
 
 router.post('/savings', auth, userController.add_savings);
 
-router.post('/savings/validate', auth, userController.validatePayment);
-
 router.post('/savings/withdrawal', auth, userController.savings_withdrawal);
 
 router.get('/myLoan', auth, userController.my_loan);

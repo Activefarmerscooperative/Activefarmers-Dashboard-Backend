@@ -6,7 +6,7 @@ const bankDetailsSchema = mongoose.Schema({
     accountName: { type: String, required: true },
     bankName: { type: String, required: true },
     bankCode: { type: String, required: true },
-    accountNumber: { type: Number, required: true },
+    accountNumber: { type: String, required: true },
     accountType: { type: String, required: false },
     createdAt: {
         type: Date,
@@ -28,7 +28,7 @@ function validateAccount(account) {
         accountName: Joi.string()
             .min(2)
             .max(1024)
-            .required(),
+            .optional(),
         bankName: Joi.string()
             .min(2)
             .max(1024)

@@ -159,7 +159,7 @@ const userSchema = new mongoose.Schema({
   regCompletePercent: {
     type: Number,
     default: 25,
-    enum: [25, 50, 75, 100]//25% before verification, 50% after verification 75% after farm details and 100% after  Gaurantor.
+    enum: [25, 50, 60, 70, 80, 90, 100]//25% before verification, 50% after verification 10% increment afterwards.
   },
   resetPassword: { type: Boolean, default: false },
   resendOTP: {
@@ -189,7 +189,8 @@ userSchema.methods.generateAuthToken = function () {
       phone: this.phone,
       membershipType: this.membershipType,
       image: this.photo,
-      reference: this.reference
+      reference: this.reference,
+      regCompletePercent: this.regCompletePercent
 
     },
     process.env.JWT,

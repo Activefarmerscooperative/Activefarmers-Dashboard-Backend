@@ -17,9 +17,11 @@ const otpGenerator = require("otp-generator");
 const OTP = require("../models/OTP");
 var request = require('request');
 const generateUniqueId = require('generate-unique-id');
-const { initiatePaystackPayment, validatePaystackPayment, charge_authorization, bankList, initiatePaystackCardValidation } = require("../utils/paystack");
+const { initiatePaystackPayment, validatePaystackPayment, charge_authorization, bankList, initiatePaystackCardValidation, verifyAccount } = require("../utils/paystack");
 const { Register_OTP, Veriify_OTP } = require("../utils/sendSMS")
 const { Card_Is_Valid } = require("../utils/checkValidCard")
+// Cloudinary config
+const cloudinary = require("../utils/cloudinary");
 
 exports.getUser = async (req, res) => {
   const user = await User.findById(req.user._id)
@@ -221,97 +223,195 @@ exports.personal_details = async (req, res) => {
 }
 
 exports.farm_details = async (req, res) => {
-  const user = await User.findByIdAndUpdate(req.user._id, {
-    $set: {
-      regCompletePercent: 75,
-      "farm.farmingExperience": req.body.farmingExperience,
-      "farm.farmSize": req.body.farmSize,
-      "farm.cropTypes": req.body.cropTypes,
-      "farm.farmAddress": req.body.farmAddress
-    }
-  }, { new: true })
+  const user = await User.findById(req.user._id);
+
+  if (!user) {
+    return res.status(StatusCodes.NOT_FOUND).json({
+      status: "error",
+      message: "User not found.",
+    });
+  }
+
+  const updateFields = {
+    "farm.farmingExperience": req.body.farmingExperience,
+    "farm.farmSize": req.body.farmSize,
+    "farm.cropTypes": req.body.cropTypes,
+    "farm.farmAddress": req.body.farmAddress,
+  };
+
+  if (user.regCompletePercent < 100 && !user.farm?.farmingExperience) {
+    updateFields.regCompletePercent = user.regCompletePercent + 10;
+  }
+
+  user.set(updateFields);
+  const token = user.generateAuthToken();
+
+  const updatedUser = await user.save();
 
   return res.status(StatusCodes.OK).json({
     status: "success",
     message: "Farm details updated successfully.",
-
+    user: updatedUser,
+    token,
   });
-}
-
+};
 exports.guarantor_details = async (req, res) => {
+  const hasLoan = await Loan.findOne({
+    user: req.user,
+    repaymentStatus: { $ne: "Completed" }
+  });
 
-  const hasLoan = await Loan.findOne({ user: req.user, repaymentStatus: { $ne: "Completed" } })
-  if (hasLoan) return res.status(StatusCodes.BAD_REQUEST).send("Unauthorized Action. Please clear up your pending loan before you can update your guaranto info.");
-  await User.findByIdAndUpdate(req.user._id, {
-    $set: {
-      regCompletePercent: 100,
-      "guarantor.full_name": req.body.full_name,
-      "guarantor.address": req.body.address,
-      "guarantor.email": req.body.email,
-      "guarantor.phone": req.body.phone,
-      "guarantor.gender": req.body.gender,
-      "guarantor.occupation": req.body.occupation,
+  if (hasLoan) {
+    return res.status(StatusCodes.BAD_REQUEST).send("Unauthorized Action. Please clear up your pending loan before you can update your guarantor info.");
+  }
+
+  const user = await User.findById(req.user._id);
+
+  if (!user) {
+    return res.status(StatusCodes.NOT_FOUND).json({
+      status: "error",
+      message: "User not found.",
+    });
+  }
+
+  const updateFields = {
+    "guarantor.full_name": req.body.full_name,
+    "guarantor.address": req.body.address,
+    "guarantor.email": req.body.email,
+    "guarantor.phone": req.body.phone,
+    "guarantor.gender": req.body.gender,
+    "guarantor.occupation": req.body.occupation,
+  };
+
+  if (user.regCompletePercent < 100 && !user.guarantor?.full_name) {
+    if (user.membershipType !== "Farmer") {
+      updateFields.regCompletePercent = user.regCompletePercent + 20;
+    } else {
+      updateFields.regCompletePercent = user.regCompletePercent + 10;
     }
-  }, { new: true })
+
+  }
+
+  user.set(updateFields);
+  const token = user.generateAuthToken();
+
+  const updatedUser = await user.save();
 
   return res.status(StatusCodes.OK).json({
     status: "success",
     message: "Guarantor details updated successfully.",
-
+    user: updatedUser,
+    token,
   });
-}
+};
 
 exports.occupation_details = async (req, res) => {
-  let option = req.body
-  await User.findByIdAndUpdate(req.user._id, {
-    $set: {
-      occupation: option,
-    }
-  }, { new: true })
+  const user = await User.findById(req.user._id);
 
+  if (!user) {
+    return res.status(StatusCodes.NOT_FOUND).json({
+      status: "error",
+      message: "User not found.",
+    });
+  }
+
+  const updateFields = {
+    occupation: req.body,
+  };
+
+  if (user.regCompletePercent < 100 && !user.occupation?.occupation) {
+    updateFields.regCompletePercent = user.regCompletePercent + 10;
+  }
+
+  const updatedUser = await User.findByIdAndUpdate(req.user._id, { $set: updateFields }, { new: true });
+  const token = updatedUser.generateAuthToken();
   return res.status(StatusCodes.OK).json({
     status: "success",
     message: "User details updated successfully.",
-
+    user: updatedUser,
+    token
   });
-}
+};
 
 exports.nextOfKin_details = async (req, res) => {
-  let option = req.body
-  await User.findByIdAndUpdate(req.user._id, {
-    $set: {
-      nextOfKin: option,
-    }
-  }, { new: true })
+  const user = await User.findById(req.user._id);
 
+  if (!user) {
+    return res.status(StatusCodes.NOT_FOUND).json({
+      status: "error",
+      message: "User not found.",
+    });
+  }
+
+  const updateFields = {
+    nextOfKin: req.body,
+  };
+
+  if (user.regCompletePercent < 100 && !user.nextOfKin?.full_name) {
+    updateFields.regCompletePercent = user.regCompletePercent + 10;
+  }
+
+  const updatedUser = await User.findByIdAndUpdate(req.user._id, { $set: updateFields }, { new: true });
+  const token = updatedUser.generateAuthToken();
   return res.status(StatusCodes.OK).json({
     status: "success",
     message: "Next of Kin details updated successfully.",
-
+    user: updatedUser,
+    token
   });
-}
+};
+
 
 exports.bank_details = async (req, res) => {
+  const { accountNumber, bankCode, bankName, accountType } = req.body;
 
-  const { accountNumber, bankCode, accountName, bankName, accountType } = req.body
-  await BankDetails.findByIdAndUpdate(req.user._id, {
-    $set: {
-      user: req.user._id,
-      accountNumber,
-      bankCode,
-      accountName,
-      bankName,
-      accountType
+  // Verify bank account number
+  const result = await verifyAccount(accountNumber, bankCode);
 
-    }
-  }, { new: true, upsert: true })
+  // Invalid account number
+  if (!result.status) {
+    return res.status(StatusCodes.UNPROCESSABLE_ENTITY).json({
+      status: "failed",
+      error: result.message,
+    });
+  }
+
+  const bankDetails = {
+    user: req.user._id,
+    accountNumber,
+    bankCode,
+    accountName: result.data.account_name,
+    bankName,
+    accountType,
+  };
+  const hasAccountPromise = BankDetails.findOne({ user: req.user._id });
+  const userPromise = User.findById(req.user._id);
+
+  let [hasAccount, user] = await Promise.all([hasAccountPromise, userPromise]);
+
+  const updateFields = {}
+
+  if (user.regCompletePercent < 100 && !hasAccount) {
+    updateFields.regCompletePercent = user.regCompletePercent + 10;
+  }
+  const userUpdate = await User.findByIdAndUpdate(req.user._id, { $set: updateFields }, { new: true });
+  await BankDetails.findOneAndUpdate(
+    {
+      user: req.user._id
+    },
+    bankDetails,
+    { new: true, upsert: true }
+  );
+
+  const token = userUpdate.generateAuthToken();
 
   return res.status(StatusCodes.OK).json({
     status: "success",
-    message: "Bank details updated successfully.",
-
+    message: "Bank details verified and updated successfully.",
+    token
   });
-}
+};
+
 
 
 exports.get_bank_details = async (req, res) => {
@@ -540,11 +640,13 @@ exports.change_password = async (req, res) => {
 // Update user Profile Photo
 exports.update_user_profile_pic = async (req, res) => {
 
+
   const result = await cloudinary.uploader.upload(req.file.path);
   const updatedUser = await User.findByIdAndUpdate(req.user._id, {
     $set: { photo: result.secure_url }
   }, { new: true })
-  res.status(200).json({ message: "Profile Pic updated Successfully", profilePic: updatedUser.photo })
+  const token = updatedUser.generateAuthToken();
+  res.status(200).json({ message: "Profile Pic updated Successfully", profilePic: updatedUser.photo, token })
 
 }
 
@@ -574,7 +676,7 @@ exports.add_savings = async (req, res) => {
 
   // Check if this is the first savings
   // First savings cannot be less dan ₦5000
-  const isFirstSavings = await Savings.find({ user: _id,status:"Confirmed" }).exec()
+  const isFirstSavings = await Savings.find({ user: _id, status: "Confirmed" }).exec()
   if (isFirstSavings.length < 1 && amount < 5000) return res.status(StatusCodes.BAD_REQUEST).json({
     status: 'failed',
     message: 'Your first saving cannot be less than ₦5000.',
@@ -644,221 +746,17 @@ exports.add_savings = async (req, res) => {
   })
 }
 
-exports.validatePayment = async (req, res) => {
-
-  const data = await validatePaystackPayment(req.body.reference);
-
-  if (!data.status) return res.status(StatusCodes.BAD_REQUEST).json({ status: 'failed', error: data.message });
-
-  if (data.data.status !== 'success') return res.status(StatusCodes.BAD_REQUEST).json({ status: 'failed', error: 'Payment not completed' });
-
-  const amount_paid = data.data.amount / 100;
-
-  const savings = await Savings.findById(data.data.metadata.savings)
-    .exec();
-
-  // If this payment has already been verified maybe either by callbackUrl or webhook prevent re-run wen page is refreshed
-  if (savings.status === "Confirmed") {
-    const response = {
-      status: 'success',
-      message: '',
-      data: {}
-    };
-
-    if (data.data.metadata?.type === "Validate Card") {
-      response.message = 'Your card validation was successful.';
-    } else {
-      response.message = 'Your savings transaction was successful.';
-      response.data.savings = savings;
-    }
-
-    return res.status(StatusCodes.OK).json(response);
-  }
-  //payment was successful, confirm the payment
-  //make sure the amount paid and order total amount corresponds
-  if (savings.amount !== amount_paid) return res.status(StatusCodes.BAD_REQUEST).json({ status: 'failed', error: 'Amount paid does not match amount recorded' });
-
-  savings.status = 'Confirmed'
-  // Each item in this order may belong to many sellers
-  // Update each item with the paymnt confirmation status.
-
-  let updateSavings = await SavingsWallet.findOne({ user: savings.user })
-
-  updateSavings.categories.map(item => {
-    if (item.category === savings.category) {
-      item.amount += savings.amount
-      return item
-    } else {
-      return item
-    }
-  })
-
-  const transaction = new Transaction({
-    _id: new mongoose.Types.ObjectId(),
-    type: 'savings',
-    user: savings.user,
-    amount: savings.amount,
-    payment_method: 'paystack',
-    reference: req.body.reference,
-    item: savings._id,
-    checkModel: "Savings"
-  })
-
-  await transaction.save();
-  await updateSavings.save();
-  await savings.save()
-
-  if (data.data.metadata?.type === "Validate Card") {
-    // Check if Card is Valid for Loan period
-    const cardIsValid = Card_Is_Valid(data.data)
-    if (!data.data.authorization.reusable || !cardIsValid) {
-      return res.status(StatusCodes.BAD_REQUEST).json({
-        status: 'success',
-        message: 'Your Card Does not meet the minimum required criteria please try another card.'
-      });
-    }
-    const card = new UserCard({
-      _id: new mongoose.Types.ObjectId(),
-      user: savings.user,
-      email: data.data.customer.email,
-      authorization: data.data.authorization
-    })
-
-    await Loan.findOneAndUpdate({ user: savings.user, status: "Pending" }, {
-      $set: {
-        cardIsValid: true
-      }
-    }, {
-      new: true
-    })
-    await card.save()
-    return res.status(StatusCodes.OK).json({
-      status: 'success',
-      message: 'Your Loan request has been completed successfully.',
-
-    });
-  }
-
-  return res.status(StatusCodes.OK).json({
-    status: 'success',
-    message: 'Your Savings transaction was successful.'
-  });
-
-}
-
-exports.validatePaymentByWebhook = async (req, res, next) => {
-  try {
-    const hash = crypto.createHmac('sha512', process.env.PAYSTACK_SECRET_KEY).update(JSON.stringify(req.body)).digest('hex');
-
-    if (!req.headers['x-paystack-signature']) return res.status(StatusCodes.UNAUTHORIZED).json({ status: 'failed', error: 'Un-authorized operation' });
-
-    if (hash == req.headers['x-paystack-signature']) {
-      // Retrieve the request's body
-      const event = req.body;
-      if (event.event == 'charge.success') {
-        const data = await validatePaystackPayment(event.data.reference);
-
-        if (!data.status) return res.status(StatusCodes.BAD_REQUEST).json({ status: 'failed', error: data.message });
-
-        if (data.data.status !== 'success') return res.status(StatusCodes.BAD_REQUEST).json({ status: 'failed', error: 'Payment not completed' });
-
-        // const amount_paid = data.data.amount / 100;
-        const order = await Order.findById(data.data.metadata.order)
-          .populate({
-            path: 'address',
-            model: 'Address',
-            populate: [
-              {
-                path: 'state',
-                model: 'State',
-              },
-              {
-                path: 'country',
-                model: 'Country',
-              }]
-          })
-          .populate({
-            path: 'items',
-            model: 'OrderItem',
-            populate: {
-              path: 'product',
-              model: 'Product',
-              populate: [{
-                path: 'unit',
-                model: 'Unit',
-              },
-              {
-                path: 'state',
-                model: 'State',
-              },
-              {
-                path: 'country',
-                model: 'Country',
-              }]
-            }
-          })
-          .exec();
-
-        // If this payment has already been verified maybe either by callbackUrl or hook prevent re-run wen page is refreshed
-        if (order.completed === true) {
-          return res.sendStatus(200);
-        }
-        //payment was successful, confirm the order
-
-
-
-        // Each item in this order may belong to many sellers
-        // Update each item with the paymnt confirmation status.
-        await OrderItem.updateMany({ _id: { $in: order.items } },
-          {
-            $push: {
-              status: {
-                text: "Confirmed",
-              }
-            }
-          });
-
-        order.payment = true;
-        order.completed = true;
-        order.status = 'In Progress';
-        await order.save();
-
-        const transaction = new Transaction({
-          _id: new mongoose.Types.ObjectId(),
-          type: 'order',
-          amount: order.amount,
-          payment_method: 'paystack',
-          reference: data.data.reference,
-          item: order._id
-        })
-
-        await transaction.save();
-        const buyer = await User.findOne({ email: data.data.customer.email })
-
-        //empty cart
-        await Cart.deleteMany({ user: buyer._id }).exec();
-
-
-        // Send Email message to Buyer
-        await orderCompleted(buyer, order)
-        return res.sendStatus(200);
-
-
-      }
-
-    } else {
-
-      return res.status(StatusCodes.UNAUTHORIZED).json({ status: 'failed', error: 'Un-authorized operation' });
-    }
-    // res.send(200);
-  } catch (error) {
-    console.log(error)
-  }
-
-}
-
 exports.savings_withdrawal = async (req, res) => {
   const { amount, category } = req.body;
+
+  const hasLoan = await Loan.findOne({
+    user: req.user,
+    repaymentStatus: { $ne: "Completed" }
+  });
+
+  if (hasLoan) {
+    return res.status(StatusCodes.BAD_REQUEST).send("Unauthorized Action. Please clear up your pending loan before you can make withdrawals.");
+  }
 
   // Get user wallet
   const myWallet = await SavingsWallet.findOne({ user: req.user }).exec()
@@ -867,6 +765,7 @@ exports.savings_withdrawal = async (req, res) => {
     error: "Invalid Action",
   });
 
+  //cant withdraw from a category that does not exist.
   const savingsCat = myWallet.categories.filter(item => item.category.toString() === category)
 
   if (savingsCat.length === 0) return res.status(StatusCodes.BAD_REQUEST).json({
@@ -1069,7 +968,7 @@ exports.validate_user_card = async (req, res) => {
 
   // If d user has an unrepaid loan he cant update his card.
   // He can only update card for pending loans.
-  const hasLoan = await Loan.find({ status: 'Pending', }).exec()
+  const hasLoan = await Loan.find({ user: req.user._id, status: 'Pending', }).exec()
   if (hasLoan.length < 1) return res.status(StatusCodes.UNAUTHORIZED).json({
     status: "failed",
     error: "Sorry you are not authorized to carry out this action.",
@@ -1085,7 +984,7 @@ exports.validate_user_card = async (req, res) => {
   const isFirstSavings = await Savings.find({ user: _id }).exec()
   if (isFirstSavings.length < 1 && amount < 5000) return res.status(StatusCodes.BAD_REQUEST).json({
     status: 'failed',
-    message: 'Your first saving cannot be less than ₦5000.',
+    error: 'Your dont have sufficient savings. So you are not qualified for a Loan.',
   });
 
   //generate reference id
@@ -1109,7 +1008,7 @@ exports.validate_user_card = async (req, res) => {
     _id: new mongoose.Types.ObjectId(),
     user: _id,
     amount,
-    category: savingsCategory._id,
+    category: savingsCategory.name,
     reference: refID
   })
 
@@ -1185,7 +1084,7 @@ exports.validate_saved_card = async (req, res) => {
     _id: new mongoose.Types.ObjectId(),
     user: _id,
     amount,
-    category: savingsCategory._id,
+    category: savingsCategory.name,
     reference: refID
   })
 

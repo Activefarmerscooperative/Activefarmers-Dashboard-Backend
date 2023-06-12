@@ -1,14 +1,14 @@
 const { default: mongoose } = require("mongoose");
 
 const savingsWithdrawalSchema = mongoose.Schema({
-    _id: {type: mongoose.Schema.Types.ObjectId},
+    _id: { type: mongoose.Schema.Types.ObjectId },
     reference: { type: String, required: true, unique: true },
     user: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'User' },
     amount: { type: Number, required: true },
-    category: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'SavingsCategory' },
+    category: { type: String, required: true, },
     status: {
         type: String,
-        enum: ['Pending', 'Confirmed',"Rejected"],
+        enum: ['Pending', 'Confirmed', "Rejected"],
         default: 'Pending'
     },
     createdAt: {
