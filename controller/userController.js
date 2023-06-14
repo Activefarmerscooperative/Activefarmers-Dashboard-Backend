@@ -12,7 +12,6 @@ const StatusCodes = require("../utils/status-codes")
 const { Otp_VerifyAccount, Otp_ForgotPassword } = require("../utils/sendMail")
 const _ = require("lodash");
 const bcrypt = require("bcrypt");
-const sendMail = require("../utils/sendMail");
 const otpGenerator = require("otp-generator");
 const OTP = require("../models/OTP");
 var request = require('request');
@@ -459,6 +458,7 @@ exports.forgot_password = async (req, res) => {
     const otp = new OTP({
       _id: mongoose.Types.ObjectId(),
       user: user._id,
+      checkModel: "User",
       code: code,
       type: "ForgotPassword",
       created_at: new Date(),
@@ -498,6 +498,7 @@ exports.forgot_password = async (req, res) => {
       .status(StatusCodes.OK).json({
         status: "success",
         message: "OTP sent to your email. Incase of any delay, check your email spam folder.",
+        token
       });
   }
 

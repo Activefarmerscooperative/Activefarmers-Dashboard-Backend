@@ -103,7 +103,8 @@ adminSchema.methods.generateAdminToken = function () {
             firstname: this.firstname,
             surname: this.surname,
             email: this.email,
-            phone: this.phone
+            phone: this.phone,
+            adminType: this.adminType
 
         },
         process.env.JWT,

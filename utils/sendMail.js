@@ -14,25 +14,22 @@ exports.Otp_VerifyAccount = async (email, name, otp) => {
       secure: true,
       auth: {
         pass: config.PASSMAILER,
-        user: "kaelocredit@gmail.com"
+        user: "activefarmersinfo@gmail.com"
       },
     });
 
     await transporter.sendMail({
-      from: "kaelocredit@gmail.com",
+      from: "activefarmersinfo@gmail.com",
       to: email,
-      subject: 'Verify Account',
-      html: ` <b> Hi ${name}, </b>
-      </br>
-      </br>
-        <p> Welcome to KAELO CREDIT SERVICE.  </p>
+      subject: ' Active Farmers Cooperative SERVICE Verify Account',
+      html:` <b> Hi ${name} </b></br>
+        <p>Please enter this code to verify your Active Farmers Cooperative Service Account.</p>
         </br>
-        
-        <p>To verify your account, Use the OTP Code below to verify account</p>
-      
         </br>
         <b>${otp}</b>
-      `,
+        </br>
+        </br>
+        <p>Thanks for helping us keep your account secure. </p>`,
 
     });
     console.log("email sent sucessfully");
