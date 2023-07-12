@@ -5,7 +5,7 @@ const Savings = require("../models/savings");
 const UserCard = require("../models/cardDetails");
 const SavingsWallet = require("../models/savingsWallet");
 const SavingsWithdrawal = require("../models/savingsWithdrawal")
-const Loan = require("../models/loan")
+const { Loan } = require("../models/loan")
 const { BankDetails } = require("../models/accountDetails");
 const Transaction = require("../models/transaction");
 const StatusCodes = require("../utils/status-codes")
@@ -411,8 +411,6 @@ exports.bank_details = async (req, res) => {
   });
 };
 
-
-
 exports.get_bank_details = async (req, res) => {
   const bank_details = await BankDetails.findOne({ user: req.user._id }).exec()
   return res.status(StatusCodes.OK).json({
@@ -512,7 +510,6 @@ exports.forgot_password = async (req, res) => {
 //Verify Email token entered by user.
 exports.verify_email_token = async (req, res) => {
 
-
   const { token } = req.body
 
   if (!token) {
@@ -549,8 +546,6 @@ exports.verify_email_token = async (req, res) => {
     status: 'success',
     message: 'OTP verified, You can now reset Password'
   });
-
-
 }
 
 exports.reset_password = async (req, res) => {
@@ -578,7 +573,6 @@ exports.reset_password = async (req, res) => {
     message: 'You have successfully reset your password',
 
   });
-
 
 }
 
@@ -840,7 +834,7 @@ exports.loan_request = async (req, res) => {
   });
 
   // Get user wallet
-  const myWallet = await SavingsWallet.findOne({ user: req.user })
+  const myWallet = await SavingsWallet.findOne({ user: req.user._id })
     .populate("user", "-password")
     .exec()
 
@@ -1150,7 +1144,7 @@ exports.cancel_loan_request = async (req, res) => {
 }
 
 exports.my_loan = async (req, res) => {
-  const hasLoan = await Loan.findOne({ status: 'Pending', }).exec()
+  const hasLoan = await Loan.findOne({ user: req.user._id, status: 'Pending', }).exec()
 
   return res.status(StatusCodes.OK).json({
     status: "success",
