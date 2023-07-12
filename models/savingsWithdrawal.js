@@ -5,6 +5,7 @@ const savingsWithdrawalSchema = mongoose.Schema({
     reference: { type: String, required: true, unique: true },
     user: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'User' },
     amount: { type: Number, required: true },
+    savings: { type: Number, required: false },
     category: { type: String, required: true, },
     status: {
         type: String,

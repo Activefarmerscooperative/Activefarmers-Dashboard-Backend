@@ -6,7 +6,7 @@ const Transaction = require("../models/transaction");
 const StatusCodes = require("../utils/status-codes")
 const { Card_Is_Valid } = require("../utils/checkValidCard")
 const UserCard = require("../models/cardDetails");
-const Loan = require("../models/loan")
+const { Loan } = require("../models/loan")
 
 exports.validatePayment = async (req, res) => {
 

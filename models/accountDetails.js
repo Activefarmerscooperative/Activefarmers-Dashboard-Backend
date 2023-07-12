@@ -8,6 +8,7 @@ const bankDetailsSchema = mongoose.Schema({
     bankCode: { type: String, required: true },
     accountNumber: { type: String, required: true },
     accountType: { type: String, required: false },
+    
     createdAt: {
         type: Date,
         default: Date.now

@@ -1,42 +1,49 @@
 const { default: mongoose } = require("mongoose");
 
 const loanSchema = mongoose.Schema({
-    _id: {type: mongoose.Schema.Types.ObjectId},
+    _id: { type: mongoose.Schema.Types.ObjectId },
     reference: { type: String, required: true, unique: true },
     user: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'User' },
     amount: { type: Number, required: true },
-    // category: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'SavingsCategory' },
+    savings: { type: Number, required: false },
     status: {
         type: String,
         enum: ['Pending', 'Confirmed', "Rejected", "Cancelled"],//User can cancel loan before it's approved.
         default: 'Pending'
     },
-    repaymentMethod:{
+    repaymentMethod: {
         type: String,
         enum: ['Card', 'Savings', 'MandateForm'],
-        required:true
+        required: true
     },
-    cardIsValid:{
-        type:Boolean,
-        default:false,
+    cardIsValid: {
+        type: Boolean,
+        default: false,
     },
-    repaymentPeriod:{
+    repaymentPeriod: {
         type: Number,
-        min:1,
-        max:12,
-        required:true
+        min: 1,
+        max: 12,
+        required: true
     },
-    repayment:[{
+    repayment: [{
         amount: {
             type: Number,
             default: 0
         },
         timestamp: { type: Date, 'default': Date.now }
     }],
-    repaymentStatus:{
+    repaymentStatus: {
         type: String,
-        default:"Ongoing",
-        enum:["Ongoing","Failed","Completed"]
+        default: "Ongoing",
+        enum: ["Ongoing", "Failed", "Completed"]
+        //Ongoing when the user has not completed loan payment
+        //Failed when the attempt to make deduction on users card fail
+        //Completed when payment has been completed and Loan closed
+    },
+    adminActionBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
+    rejectionReason: {
+        type: String,
     },
     createdAt: {
         type: Date,
@@ -44,4 +51,26 @@ const loanSchema = mongoose.Schema({
     }
 });
 
-module.exports = mongoose.model('Loan', loanSchema);
+const Loan = mongoose.model('Loan', loanSchema);
+
+function validateLoan(loan) {
+    amount, repaymentMethod, repaymentPeriod
+    const schema = Joi.object({
+        amount: Joi.string()
+            .min(2)
+            .max(250)
+            .required(),
+        repaymentMethod: Joi.string()
+            .min(2)
+            .max(250)
+            .required(),
+        repaymentPeriod: Joi.string()
+            .pattern(/^(1[0-2]|[1-9])$/)
+            .message('Invalid period selected.')
+            .required(),
+
+    })
+    return schema.validate(loan);
+}
+exports.Loan = Loan;
+exports.validateLoan = validateLoan;
