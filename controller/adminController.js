@@ -15,7 +15,15 @@ const SavingsWallet = require("../models/savingsWallet");
 const TransferRecipient = require("../models/transfer")
 const { verifyAccount, createTransferRecip, initiateTransfer } = require("../utils/paystack");
 const session = require('mongoose').startSession;
+// Cloudinary config
+const cloudinary = require("../utils/cloudinary");
 
+exports.getUser = async (req, res) => {
+    const admin = await Admin.findById(req.user._id)
+        .select("-password -isVerified -resetPassword -resendOTP")
+        .populate("location", "_id name");
+    res.status(StatusCodes.OK).json(admin);
+}
 
 exports.registerAdmin = async (req, res) => {
 
@@ -291,6 +299,38 @@ exports.change_password = async (req, res) => {
     });
 }
 
+exports.update_profile = async (req, res) => {
+    await Admin.findByIdAndUpdate(req.user._id, {
+        $set: {
+            surname: req.body.surname,
+            firstname: req.body.firstname,
+            phone: req.body.phone,
+            gender: req.body.gender,
+            address: req.body.address
+
+        }
+    }, { new: true })
+
+
+    return res.status(StatusCodes.OK).json({
+        status: "success",
+        message: "User details updated successfully.",
+
+    });
+}
+
+// Update user Profile Photo
+exports.update_admin_profile_pic = async (req, res) => {
+
+    const result = await cloudinary.uploader.upload(req.file.path);
+    const updatedUser = await Admin.findByIdAndUpdate(req.user._id, {
+        $set: { photo: result.secure_url }
+    }, { new: true })
+
+    res.status(200).json({ message: "Profile Pic updated Successfully", profilePic: updatedUser.photo })
+
+}
+
 exports.confirmAFCSToken = async (req, res) => {
     return res.status(StatusCodes.OK).json({
         status: 'success',
@@ -324,7 +364,7 @@ exports.getMembersLoan = async (req, res) => {
 
     const userLoan = await Loan.findOne({ user: req.params.id, repaymentStatus: { $ne: 'Completed' }, status: 'Confirmed' })
         .exec()
-  
+
     return res.status(StatusCodes.OK).json(!userLoan ? 0 : userLoan.amount);
 
 }
