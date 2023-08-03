@@ -12,6 +12,10 @@ const savingsWithdrawalSchema = mongoose.Schema({
         enum: ['Pending', 'Confirmed', "Rejected"],
         default: 'Pending'
     },
+    adminActionBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
+    rejectionReason: {
+        type: String,
+    },
     createdAt: {
         type: Date,
         default: Date.now

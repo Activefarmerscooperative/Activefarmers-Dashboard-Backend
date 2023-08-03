@@ -82,6 +82,11 @@ router.put('/loan/:id/rejection', auth, adminController.handleLoanRejection)
 
 router.put('/loan/:id/approval', auth, adminController.handleLoanApproval)
 
+//id here is withdrawal id
+router.put('/withdrawal/:id/rejection', auth, adminController.handleWithdrawalRejection)
+
+router.put('/withdrawal/:id/approval', auth, adminController.handleWithdrawalApproval)
+
 router.get('/transfer-requests', auth, adminController.transferRequests)
 
 router.put('/loan/:id/payment', auth, adminController.handlePaymentTransfer)

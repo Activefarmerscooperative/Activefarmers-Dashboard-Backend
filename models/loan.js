@@ -31,14 +31,20 @@ const loanSchema = mongoose.Schema({
             type: Number,
             default: 0
         },
+        paymentMethod: {
+            type: String
+        },
         timestamp: { type: Date, 'default': Date.now }
     }],
+    cronStatus:{
+        type: String,
+        enum: ["Initiated", "Failed", "Successful"]
+    },
     repaymentStatus: {
         type: String,
         default: "Ongoing",
-        enum: ["Ongoing", "Failed", "Completed"]
+        enum: ["Ongoing", "Completed"]
         //Ongoing when the user has not completed loan payment
-        //Failed when the attempt to make deduction on users card fail
         //Completed when payment has been completed and Loan closed
     },
     adminActionBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },

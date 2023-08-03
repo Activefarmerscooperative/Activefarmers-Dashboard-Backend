@@ -17,6 +17,7 @@ const { verifyAccount, createTransferRecip, initiateTransfer } = require("../uti
 const session = require('mongoose').startSession;
 // Cloudinary config
 const cloudinary = require("../utils/cloudinary");
+const Payout = require('../models/adminPayout');
 
 exports.getUser = async (req, res) => {
     const admin = await Admin.findById(req.user._id)
@@ -545,7 +546,7 @@ exports.handleLoanRejection = async (req, res) => {
         error: "Please give a reason for rejecting this apllication.",
     });
     //Loan request was declined
-    const loan = await Loan.findByIdAndUpdate(rq.params.id, {
+    const loan = await Loan.findByIdAndUpdate(req.params.id, {
         $set: {
             status: "Rejected",
             adminActionBy: req.user._id,
@@ -609,6 +610,95 @@ exports.handleLoanApproval = async (req, res) => {
         await session.abortTransaction();
         session.endSession();
     }
+}
+
+exports.handleWithdrawalRejection = async (req, res) => {
+    const { rejectionReason } = req.body
+    if (!rejectionReason) return res.status(StatusCodes.BAD_REQUEST).json({
+        status: "failed",
+        error: "Please give a reason for rejecting this apllication.",
+    });
+    //Loan request was declined
+    const withdrawal = await SavingsWithdrawal.findByIdAndUpdate(req.params.id, {
+        $set: {
+            status: "Rejected",
+            adminActionBy: req.user._id,
+            rejectionReason
+        }
+    }, {
+        new: true
+    })
+
+    if (!withdrawal) return res.status(StatusCodes.BAD_REQUEST).json({
+        status: "failed",
+        error: "Withdrawal request not found.",
+    });
+
+    res.status(StatusCodes.OK).json({ message: `Withdrawal rejected Successfully` })
+
+}
+
+exports.handleWithdrawalApproval = async (req, res) => {
+
+    //Loan request was declined
+    const withdrawal = await SavingsWithdrawal.findById(req.params.id)
+
+    if (!withdrawal) return res.status(StatusCodes.BAD_REQUEST).json({
+        status: "failed",
+        error: "Withdrawal request not found.",
+    });
+
+    const hasLoan = await Loan.findOne({
+        user: withdrawal.user,
+        repaymentStatus: { $ne: "Completed" }
+    });
+
+    if (hasLoan) {
+        return res.status(StatusCodes.BAD_REQUEST).send("User has pending loan to clear.");
+    }
+
+    // Get user wallet
+    const userWallet = await SavingsWallet.findOne({ user: withdrawal.user }).exec()
+    if (!userWallet) return res.status(StatusCodes.BAD_REQUEST).json({
+        status: "failed",
+        error: "Invalid Action, user has no savings account",
+    });
+
+    //cant withdraw from a category that does not exist.
+    const savingsCat = userWallet.categories.filter(item => item.category.toString() === withdrawal.category)
+
+    if (savingsCat.length === 0) return res.status(StatusCodes.BAD_REQUEST).json({
+        status: "failed",
+        error: "Invalid Transaction. User has no savings in the requested category.",
+    });
+
+    if (savingsCat[0].amount < withdrawal.amount) return res.status(StatusCodes.NOT_ACCEPTABLE).json({
+        status: "failed",
+        error: "User have Insufficient funds in the requested category.",
+    });
+
+    // Approve request
+    //ToDo: Initiate Paystack transfer here.
+    // Session Transaction in this model
+
+    withdrawal.status = "Confirmed"
+
+    // initiate admin payout here.
+    const payout = new Payout({
+        type: "SavingsWithdrawal",
+        amount: withdrawal.amount,
+        admin: req.user._id,
+        payment_method: "Cash Transfer",
+        item: withdrawal._id,
+        checkModel: "SavingsWithdrawal"
+    })
+    await withdrawal.save()
+    await payout.save()
+
+    return res.status(StatusCodes.OK).json({
+        status: 'success',
+        message: 'Withdrawal Request approved successfully.'
+    });
 }
 
 exports.transferRequests = async (req, res) => {
