@@ -3,44 +3,41 @@ const Joi = require("joi");
 const mongoose = require("mongoose");
 
 const adminSchema = new mongoose.Schema({
+
     surname: {
-        type: String,
-        required: true,
-        minlength: 2,
-        maxlength: 250
+      type: String,
+      required: true,
+      minlength: 2,
+      maxlength: 250
     },
     firstname: {
-        type: String,
-        required: true,
-        minlength: 2,
-        maxlength: 250
+      type: String,
+      required: true,
+      minlength: 2,
+      maxlength: 250
     },
     email: {
-        type: String,
-        required: true,
-        minlength: 5,
-        maxlength: 255,
-        unique: true
+      type: String,
+      required: true,
+      minlength: 5,
+      maxlength: 255,
+      unique: true,
+      match: /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
     },
     gender: {
-        type: String,
-        required: true,
-        minlength: 3,
-        maxlength: 20,
+      type: String,
+      required: true,
+      minlength: 3,
+      maxlength: 20,
     },
     location: {
-        type: String,
-        required: true,
-        minlength: 5,
-        maxlength: 255,
-        unique: true
+        type: mongoose.Schema.Types.ObjectId, required: true, ref: 'State'
     },
     lga: {
         type: String,
-        required: true,
+        required: false,
         minlength: 5,
         maxlength: 255,
-        unique: true
     },
     address: {
         type: String,
@@ -151,15 +148,18 @@ function validateAdmin(admin) {
             .required(),
         lga: Joi.string().regex(/^[0-9a-fA-F]{24}$/)
             .message('Please enter a valid LGA ID')
-            .required(),
+            .optional(),
         password: Joi.string()
             .min(5)
             .max(255)
             .required(),
         address: Joi.string()
+            .min(3)
+            .required(),
+        membershipType: Joi.string()
             .min(5)
-            .max(10)
-            .required()
+            .max(255)
+            .required(),
 
     })
     return schema.validate(admin);

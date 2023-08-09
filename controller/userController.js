@@ -1313,7 +1313,7 @@ exports.cancel_loan_request = async (req, res) => {
 }
 
 exports.my_loan = async (req, res) => {
-  const hasLoan = await Loan.findOne({ status: 'Pending', }).exec()
+  const hasLoan = await Loan.findOne({ user: req.user._id, status: 'Pending', }).exec()
 
   return res.status(StatusCodes.OK).json({
     status: "success",

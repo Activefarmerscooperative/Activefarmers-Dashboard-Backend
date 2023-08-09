@@ -35,6 +35,34 @@ exports.adminLoginValidator = function (req) {
     return schema.validate(req);
 }
 
+exports.adminProfileValidator = function (admin) {
+
+    const schema = Joi.object({
+        firstname: Joi.string()
+            .min(2)
+            .max(250)
+            .required(),
+        surname: Joi.string()
+            .min(2)
+            .max(250)
+            .required(),
+        phone: Joi.string()
+            .pattern(new RegExp(/[1-9]\d{1,14}$/))
+            .message('Please enter a valid phone number in international format')
+            .required(),
+        gender: Joi.string()
+            .min(3)
+            .max(20)
+            .required(),
+        address: Joi.string()
+            .min(3)
+            .required(),
+
+    })
+    return schema.validate(admin);
+}
+
+
 exports.scheduledSavingsValidator = function (req) {
     // Joi schema for validation
     const schema = Joi.object({

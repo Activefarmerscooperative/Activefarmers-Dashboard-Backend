@@ -62,7 +62,7 @@ exports.initiatePaystackScheduledCardValidation = async (amount, email, name, sa
 //Charge a user saved card.
 exports.charge_authorization = async (amount, email, authorization_code) => {
   const params = {
-    amount: amount,
+    amount: amount * 100,
     email: email,
     authorization_code
   };
