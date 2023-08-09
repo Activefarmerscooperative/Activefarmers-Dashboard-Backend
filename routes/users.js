@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const express = require('express');
 const router = express.Router();
 const userController = require("../controller/userController")
-const { loginValidator, validate } = require("../middleware/validation");
+const { loginValidator, validate, scheduledSavingsValidator } = require("../middleware/validation");
 const { validateUser, validateUserUpdate, validateFarm, validateGuarantor, validateUserOccupation, validateNextOfKin } = require("../models/user");
 const auth = require("../middleware/auth")
 const upload = require("../utils/multer");
@@ -67,9 +67,15 @@ router.get('/savings-category', auth, userController.get_savings_category);
 //My Savings Wallet 
 router.get('/savings-wallet', auth, userController.get_my_savings_wallet);
 
+router.get('/scheduled-savings', auth, userController.get_my_scheduled_savings);
+
 router.post('/savings', auth, userController.add_savings);
 
 router.post('/savings/withdrawal', auth, userController.savings_withdrawal);
+
+router.post('/scheduled-savings', auth,validate(scheduledSavingsValidator), userController.add_scheduled_savings);
+
+router.put('/scheduled-savings/:id/card', auth, userController.add_scheduled_savings_card);
 
 router.get('/myLoan', auth, userController.my_loan);
 

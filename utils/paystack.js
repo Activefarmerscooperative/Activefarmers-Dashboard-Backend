@@ -21,6 +21,7 @@ exports.initiatePaystackPayment = async (amount, email, name, savings) => {
   return data;
 };
 
+//Validate users card for Loan application.
 exports.initiatePaystackCardValidation = async (amount, email, name, savings) => {
   const params = {
     amount: amount * 100,
@@ -39,6 +40,25 @@ exports.initiatePaystackCardValidation = async (amount, email, name, savings) =>
   return data;
 };
 
+//Validate users card for Loan application.
+exports.initiatePaystackScheduledCardValidation = async (amount, email, name, savings,scheduledSavings) => {
+  const params = {
+    amount: amount * 100,
+    email: email,
+    name: name,
+    channels:['card'],
+    metadata: {
+      type:"Scheduled Savings Card",
+      scheduledSavings,
+      savings,
+      
+    }
+  };
+
+  const data = await paystack.transaction.initialize(params);
+
+  return data;
+};
 //Charge a user saved card.
 exports.charge_authorization = async (amount, email, authorization_code) => {
   const params = {
@@ -51,6 +71,7 @@ exports.charge_authorization = async (amount, email, authorization_code) => {
 
   return data;
 };
+
 exports.validatePaystackPayment = async (reference) => {
   const data = await paystack.transaction.verify(reference);
 
@@ -111,11 +132,12 @@ exports.createTransferRecip = async (account_name, account_number, bank_code) =>
 
 
 
-exports.initiateTrans = async (amount, recipient_code, reason) => {
+exports.initiateTransfer = async (amount, recipient_code,reference, reason) => {
   const params = {
     source: "balance",
     amount: amount * 100,
     recipient: recipient_code,
+    // reference,
     reason: reason ? reason : "Transfer made from my Wallet Account",
 
   }

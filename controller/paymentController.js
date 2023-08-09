@@ -6,7 +6,9 @@ const Transaction = require("../models/transaction");
 const StatusCodes = require("../utils/status-codes")
 const { Card_Is_Valid } = require("../utils/checkValidCard")
 const UserCard = require("../models/cardDetails");
-const Loan = require("../models/loan")
+const { Loan } = require("../models/loan");
+const SavingsCardDetails = require("../models/savingsCardDetails");
+const { ScheduledSavings } = require("../models/scheduledSavings");
 
 exports.validatePayment = async (req, res) => {
 
@@ -30,7 +32,7 @@ exports.validatePayment = async (req, res) => {
             data: {}
         };
 
-        if (data.data.metadata?.type === "Validate Card") {
+        if (data.data.metadata?.type === "Validate Card" || data.data.metadata?.type === "Scheduled Savings Card") {
             response.message = 'Your card validation was successful.';
         } else {
             response.message = 'Your savings transaction was successful.';
@@ -100,9 +102,25 @@ exports.validatePayment = async (req, res) => {
             message: 'Your Loan request has been completed successfully.',
 
         });
+    } else if (data.data.metadata?.type === "Scheduled Savings Card") {
+        const scheduledSavings = await ScheduledSavings.findById(data.data.metadata.scheduledSavings)
+            .exec();
+        const savingsCard = new SavingsCardDetails({
+            _id: new mongoose.Types.ObjectId(),
+            user: scheduledSavings.user,
+            email: data.data.customer.email,
+            authorization: data.data.authorization
+        })
+        await savingsCard.save();
+        await ScheduledSavings.findByIdAndUpdate(scheduledSavings._id, {
+            card: savingsCard._id,
+            status: "Active"
+        })
+        return res.status(StatusCodes.OK).json({
+            status: 'success',
+            message: 'Your Card validation transaction was successful.'
+        });
     }
-
-
 
     return res.status(StatusCodes.OK).json({
         status: 'success',

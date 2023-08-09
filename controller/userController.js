@@ -5,7 +5,7 @@ const Savings = require("../models/savings");
 const UserCard = require("../models/cardDetails");
 const SavingsWallet = require("../models/savingsWallet");
 const SavingsWithdrawal = require("../models/savingsWithdrawal")
-const Loan = require("../models/loan")
+const { Loan } = require("../models/loan")
 const { BankDetails } = require("../models/accountDetails");
 const Transaction = require("../models/transaction");
 const StatusCodes = require("../utils/status-codes")
@@ -16,11 +16,13 @@ const otpGenerator = require("otp-generator");
 const OTP = require("../models/OTP");
 var request = require('request');
 const generateUniqueId = require('generate-unique-id');
-const { initiatePaystackPayment, validatePaystackPayment, charge_authorization, bankList, initiatePaystackCardValidation, verifyAccount } = require("../utils/paystack");
+const { initiatePaystackPayment, validatePaystackPayment, charge_authorization, bankList, initiatePaystackCardValidation, verifyAccount, initiatePaystackScheduledCardValidation } = require("../utils/paystack");
 const { Register_OTP, Veriify_OTP } = require("../utils/sendSMS")
 const { Card_Is_Valid } = require("../utils/checkValidCard")
 // Cloudinary config
 const cloudinary = require("../utils/cloudinary");
+const { ScheduledSavings } = require("../models/scheduledSavings");
+const SavingsCardDetails = require("../models/savingsCardDetails");
 
 exports.getUser = async (req, res) => {
   const user = await User.findById(req.user._id)
@@ -411,8 +413,6 @@ exports.bank_details = async (req, res) => {
   });
 };
 
-
-
 exports.get_bank_details = async (req, res) => {
   const bank_details = await BankDetails.findOne({ user: req.user._id }).exec()
   return res.status(StatusCodes.OK).json({
@@ -512,7 +512,6 @@ exports.forgot_password = async (req, res) => {
 //Verify Email token entered by user.
 exports.verify_email_token = async (req, res) => {
 
-
   const { token } = req.body
 
   if (!token) {
@@ -549,8 +548,6 @@ exports.verify_email_token = async (req, res) => {
     status: 'success',
     message: 'OTP verified, You can now reset Password'
   });
-
-
 }
 
 exports.reset_password = async (req, res) => {
@@ -578,7 +575,6 @@ exports.reset_password = async (req, res) => {
     message: 'You have successfully reset your password',
 
   });
-
 
 }
 
@@ -653,17 +649,28 @@ exports.update_user_profile_pic = async (req, res) => {
 
 exports.get_savings_category = async (req, res) => {
 
-  const savingsCategory = await SavingsCategory.find().exec()
-  res.status(StatusCodes.OK).json({ message: "Success", savingsCategory })
+  const wallet = await SavingsWallet.findOne({ user: req.user._id }).exec()
+
+  let savingsCategories = wallet.categories.map(item => item.category)
+  res.status(StatusCodes.OK).json({ message: "Success", savingsCategories })
 }
 
 exports.get_my_savings_wallet = async (req, res) => {
 
   const savingsWallet = await SavingsWallet.findOne({
     user: req.user._id
-  })
-    .exec()
+  }).exec()
   res.status(StatusCodes.OK).json({ message: "Success", savingsWallet })
+}
+
+
+exports.get_my_scheduled_savings = async (req, res) => {
+
+  const scheduledSavings = await ScheduledSavings.find({
+    user: req.user._id,
+    status: "Active"
+  }).exec()
+  res.status(StatusCodes.OK).json({ message: "Success", scheduledSavings })
 }
 
 exports.add_savings = async (req, res) => {
@@ -821,6 +828,162 @@ exports.savings_withdrawal = async (req, res) => {
     message: 'Your withdrawal request was successful and awaiting admin approval.'
   });
 }
+exports.add_scheduled_savings = async (req, res) => {
+
+  const { amount, category, newCategory, date } = req.body;
+  const capitalizeFirstLetter = string => `${string.charAt(0).toUpperCase()}${string.slice(1)}`;
+
+  // Add new Savings category
+  if (newCategory) {
+    //Make first letter of newCategory uppercase
+    let addCategory = capitalizeFirstLetter(newCategory)
+    const savingsWallet = await SavingsWallet.findOne({ user: req.user._id }).exec()
+    const categoryExist = savingsWallet.categories.filter(item => item.category === addCategory)
+
+    // If this category name already exist return error
+    if (categoryExist.length > 0) {
+      return res.status(StatusCodes.BAD_REQUEST).json({
+        status: 'failed',
+        message: `Saving category name "${addCategory}" already exist.`,
+      });
+    } else {
+      //Category name does not exist create it.
+      savingsWallet.categories.push({
+        category: addCategory,
+        amount: 0,
+      })
+      await savingsWallet.save()
+    }
+  }
+
+  const scheduledSaving = new ScheduledSavings({
+    _id: new mongoose.Types.ObjectId(),
+    user: req.user._id,
+    amount,
+    category: newCategory ? newCategory : category,
+    scheduledDate: date
+  })
+
+  await scheduledSaving.save()
+
+
+  // Check for card validity
+  const findCard = await UserCard.findOne({ user: req.user._id })
+  if (!findCard) {
+    return res.status(StatusCodes.OK).json({
+      status: 'no_card',
+      message: 'To complete your Scheduled Savings request please enter a valid Debit card.',
+      data: scheduledSaving._id
+    });
+  }
+
+  if (!findCard.authorization.reusable) {
+    return res.status(StatusCodes.OK).json({
+      status: 'bad_card',
+      message: 'Your Saved Card Does not meet the minimum required criteria. Do you want to try another card?',
+      data: scheduledSaving._id
+    });
+  }
+
+  let last4 = findCard.authorization.last4,
+    bank = findCard.authorization.bank,
+    brand = findCard.authorization.brand
+
+  return res.status(StatusCodes.OK).json({
+    status: 'validate_card',
+    message: `Do yo want to use your ${bank} ${brand} card number **** **** ${last4} for this scheduled savings?`,
+    data: scheduledSaving._id
+  });
+
+}
+
+exports.add_scheduled_savings_card = async (req, res) => {
+  const { type } = req.query
+
+  let card;
+  if (type === "validate_card") {
+    const savedCard = await UserCard.findOne({ user: req.user._id })
+    const checkCard = await SavingsCardDetails.find({ user: req.user._id })
+    let cardExist = checkCard.filter(item => item.authorization.authorization_code === savedCard.authorization.authorization_code)
+
+    if (cardExist.length > 0) {
+      card = cardExist[0]
+    }else{
+      const savingsCard = new SavingsCardDetails({
+        _id: new mongoose.Types.ObjectId(),
+        user: req.user._id,
+        email: savedCard.email,
+        authorization: savedCard.authorization
+      })
+      card = await savingsCard.save();
+    }
+
+  } else {
+    const { _id, firstname, surname, email } = req.user
+    const amount = 50
+    let name = `${firstname} ${surname}`
+
+    // Check if this is the first savings
+    // First savings cannot be less dan ₦5000
+    // const isFirstSavings = await Savings.find({ user: _id }).exec()
+    // if (isFirstSavings.length < 1 && amount < 5000) return res.status(StatusCodes.BAD_REQUEST).json({
+    //   status: 'failed',
+    //   error: 'Your dont have sufficient savings. So you are not qualified for a Loan.',
+    // });
+
+    //generate reference id
+    let refID = generateUniqueId({
+      length: 15,
+      useLetters: false
+    });
+
+    //make sure the savings reference id is unique
+    let id_check = await Savings.findOne({ reference: refID }).exec();
+    while (id_check !== null) {
+      refID = generateUniqueId({
+        length: 15,
+        useLetters: false
+      });
+
+      id_check = await Savings.findOne({ reference: refID }).exec();
+    }
+    const savingsCategory = await SavingsCategory.findOne({ name: "Regular" }).exec()
+
+    const savings = new Savings({
+      _id: new mongoose.Types.ObjectId(),
+      user: _id,
+      amount,
+      category: savingsCategory.name,
+      reference: refID
+    })
+
+    const { data } = await initiatePaystackScheduledCardValidation(amount, email, name, savings._id,req.params.id);
+
+    // If Paystack doesn't initiate payment stop the payment
+    if (!data) return res.status(StatusCodes.BAD_REQUEST).json({
+      status: 'failed',
+      message: 'Operation Failed',
+    });
+    await savings.save();
+
+    return res.status(StatusCodes.CREATED).json({
+      status: 'success',
+      message: 'Operation successful',
+      data
+
+    })
+  }
+
+  await ScheduledSavings.findByIdAndUpdate(req.params.id, {
+    card: card._id,
+    status: "Active"
+  })
+
+  return res.status(StatusCodes.OK).json({
+    status: "success",
+    message: "Your scheduled savings has been activated.",
+  });
+}
 
 exports.loan_request = async (req, res) => {
 
@@ -840,7 +1003,7 @@ exports.loan_request = async (req, res) => {
   });
 
   // Get user wallet
-  const myWallet = await SavingsWallet.findOne({ user: req.user })
+  const myWallet = await SavingsWallet.findOne({ user: req.user._id })
     .populate("user", "-password")
     .exec()
 

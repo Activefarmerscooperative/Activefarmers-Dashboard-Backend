@@ -21,7 +21,29 @@ exports.loginValidator = function (req) {
     return schema.validate(req);
 }
 
+exports.adminLoginValidator = function (req) {
+    const schema = Joi.object({
+        email: Joi.string()
+            .email()
+            .message('Please enter a valid email')
+            .required(),
+        password: Joi.string()
+            .min(5)
+            .max(255)
+            .required(),
+    })
+    return schema.validate(req);
+}
 
-
+exports.scheduledSavingsValidator = function (req) {
+    // Joi schema for validation
+    const schema = Joi.object({
+        amount: Joi.number().positive().required(),
+        category: Joi.string().trim().required(),
+        newCategory: Joi.string().min(0).trim().allow(null).optional(),
+        date: Joi.date().iso().required(),
+    });
+    return schema.validate(req);
+}
 // exports.validate = validate;
 // exports.loginValidator = loginValidator;

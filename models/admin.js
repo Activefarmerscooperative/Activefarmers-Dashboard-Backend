@@ -70,6 +70,7 @@ const adminSchema = new mongoose.Schema({
     adminType: {
         type: String,
         required: true,
+        default:"Admin",
         enum: ["Super-Admin", "Admin"]
     },
 
@@ -96,7 +97,7 @@ const adminSchema = new mongoose.Schema({
         timestamps: true,
     });
 
-adminSchema.methods.generateAdminToken = function () {
+adminSchema.methods.generateAuthToken = function () {
     const token = jwt.sign(
         {
             _id: this._id,
@@ -152,10 +153,6 @@ function validateAdmin(admin) {
             .message('Please enter a valid LGA ID')
             .required(),
         password: Joi.string()
-            .min(5)
-            .max(255)
-            .required(),
-        membershipType: Joi.string()
             .min(5)
             .max(255)
             .required(),
