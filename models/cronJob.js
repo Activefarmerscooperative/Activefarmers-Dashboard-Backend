@@ -7,10 +7,12 @@ const cronJobSchema = mongoose.Schema({
     status: { type: String, default: "Pending", enum: ["Pending", "Initiated", "Successful", "Failed"] },
     message: { type: String, },
     amount: {type:Number},
+    payment_method: {type: String},
+    reference: {type: String},
     item: { type: mongoose.Schema.Types.ObjectId, required: true, refPath: 'checkModel' },
     checkModel: {
         type: String,
-        enum: ['Savings', "Loan"],
+        enum: ['ScheduledSavings', "Loan"],
         // required: true,
     },
     createdAt: {

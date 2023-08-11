@@ -8,17 +8,20 @@ const scheduledSavingsSchema = mongoose.Schema({
     category: { type: String, required: true },
     status: {
         type: String,
-        enum: ["Processing",'Active', "Cancelled"],
-        default:"Processing"
+        enum: ["Processing", 'Active', "Cancelled"],
+        default: "Processing"
 
     },
 
     savings: [{ type: mongoose.Schema.Types.ObjectId, required: true, ref: 'Savings' }],
 
     scheduledDate: {
-        type: Date,
-      
-    }
+        type: Number,
+    },
+    cronStatus: {
+        type: String,
+        enum: ["Initiated", "Failed", "Successful"]
+    },
 });
 
 exports.ScheduledSavings = mongoose.model('ScheduledSavings', scheduledSavingsSchema);

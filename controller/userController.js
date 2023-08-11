@@ -669,7 +669,9 @@ exports.get_my_scheduled_savings = async (req, res) => {
   const scheduledSavings = await ScheduledSavings.find({
     user: req.user._id,
     status: "Active"
-  }).exec()
+  })
+    .populate("savings")
+    .exec()
   res.status(StatusCodes.OK).json({ message: "Success", scheduledSavings })
 }
 
@@ -855,7 +857,16 @@ exports.add_scheduled_savings = async (req, res) => {
       await savingsWallet.save()
     }
   }
+  //Check if the requested category already has sceduled savings
+  const hasScheduled = await ScheduledSavings.findOne({
+    user: req.user._id,
+    category
+  })
+  if (hasScheduled) return res.status(StatusCodes.CONFLICT).json({
+    status: 'failed',
+    error: 'You already have a scheduled savings for the requested category.',
 
+  });
   const scheduledSaving = new ScheduledSavings({
     _id: new mongoose.Types.ObjectId(),
     user: req.user._id,
@@ -897,6 +908,74 @@ exports.add_scheduled_savings = async (req, res) => {
 
 }
 
+exports.edit_scheduled_savings = async (req, res) => {
+  const { type } = req.query
+  if (type === "cancel") {
+    await ScheduledSavings.findByIdAndUpdate(req.params.id, {
+      $set: {
+        status: "Cancelled"
+      }
+    },
+      {
+        new: true
+      })
+    return res.status(StatusCodes.OK).json({
+      status: 'success',
+      message: `ScheduledSavings Cancelled Successfully`,
+    });
+  } else {
+    const { amount, category, newCategory, date } = req.body;
+
+    await ScheduledSavings.findByIdAndUpdate(req.params.id, {
+      $set: {
+        amount,
+        scheduledDate: date,
+      }
+    },
+      {
+        new: true
+      })
+    return res.status(StatusCodes.OK).json({
+      status: 'success',
+      message: `ScheduledSavings Updated Successfully`,
+    });
+  }
+
+}
+
+exports.get_scheduled_savings_card = async (req, res) => {
+
+  const scheduledSavings = await ScheduledSavings.findById(req.params.id)
+
+  // Check for card validity
+  const findCard = await SavingsCardDetails.findById(scheduledSavings.card)
+  if (!findCard) {
+    return res.status(StatusCodes.UNPROCESSABLE_ENTITY).json({
+      status: 'no_card',
+      message: 'Invalid request! Card not found.',
+    });
+  }
+
+  if (!findCard.authorization.reusable) {
+    return res.status(StatusCodes.OK).json({
+      status: 'bad_card',
+      message: 'Your Saved Card Does not meet the minimum required criteria. Please try another card?',
+
+    });
+  }
+
+  let last4 = findCard.authorization.last4,
+    bank = findCard.authorization.bank,
+    brand = findCard.authorization.brand
+
+  return res.status(StatusCodes.OK).json({
+    status: 'change_card',
+    message: `Do yo want to change your ${bank} ${brand} card number **** **** ${last4} for this scheduled savings?`,
+    data: scheduledSavings._id
+  });
+}
+
+
 exports.add_scheduled_savings_card = async (req, res) => {
   const { type } = req.query
 
@@ -908,7 +987,7 @@ exports.add_scheduled_savings_card = async (req, res) => {
 
     if (cardExist.length > 0) {
       card = cardExist[0]
-    }else{
+    } else {
       const savingsCard = new SavingsCardDetails({
         _id: new mongoose.Types.ObjectId(),
         user: req.user._id,
@@ -957,7 +1036,7 @@ exports.add_scheduled_savings_card = async (req, res) => {
       reference: refID
     })
 
-    const { data } = await initiatePaystackScheduledCardValidation(amount, email, name, savings._id,req.params.id);
+    const { data } = await initiatePaystackScheduledCardValidation(amount, email, name, savings._id, req.params.id);
 
     // If Paystack doesn't initiate payment stop the payment
     if (!data) return res.status(StatusCodes.BAD_REQUEST).json({

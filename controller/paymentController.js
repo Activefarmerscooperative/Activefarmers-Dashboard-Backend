@@ -46,8 +46,6 @@ exports.validatePayment = async (req, res) => {
     if (savings.amount !== amount_paid) return res.status(StatusCodes.BAD_REQUEST).json({ status: 'failed', error: 'Amount paid does not match amount recorded' });
 
     savings.status = 'Confirmed'
-    // Each item in this order may belong to many sellers
-    // Update each item with the paymnt confirmation status.
 
     let updateSavings = await SavingsWallet.findOne({ user: savings.user })
 
@@ -103,8 +101,10 @@ exports.validatePayment = async (req, res) => {
 
         });
     } else if (data.data.metadata?.type === "Scheduled Savings Card") {
+        console.log(data.data.metadata.scheduledSavings)
         const scheduledSavings = await ScheduledSavings.findById(data.data.metadata.scheduledSavings)
             .exec();
+console.log(scheduledSavings)
         const savingsCard = new SavingsCardDetails({
             _id: new mongoose.Types.ObjectId(),
             user: scheduledSavings.user,

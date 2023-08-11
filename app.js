@@ -6,6 +6,7 @@ require('dotenv').config();
 const cron = require('node-cron');
 const loanDeduction = require('./utils/cronJobs/loanDeduction');
 const resetCron = require('./utils/cronJobs/resetCron');
+const scheduledSavingsDeduction = require('./utils/cronJobs/scheduledSavings');
 
 require("./startup/logging")();
 app.use(morgan('tiny'));
@@ -23,6 +24,11 @@ require("./startup/db")();
 // cron.schedule('* * * * *', () => {
 //   console.log("running every now and den")
 //   resetCron()
+// });
+// cron.schedule('* * * * *', () => {
+//   console.log("running every minute");
+//   scheduledSavingsDeduction()
+
 // });
 require("./startup/routes")(app);
 

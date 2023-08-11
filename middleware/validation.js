@@ -62,14 +62,14 @@ exports.adminProfileValidator = function (admin) {
     return schema.validate(admin);
 }
 
-
 exports.scheduledSavingsValidator = function (req) {
+
     // Joi schema for validation
     const schema = Joi.object({
         amount: Joi.number().positive().required(),
         category: Joi.string().trim().required(),
         newCategory: Joi.string().min(0).trim().allow(null).optional(),
-        date: Joi.date().iso().required(),
+        date: Joi.number().positive().required(),
     });
     return schema.validate(req);
 }

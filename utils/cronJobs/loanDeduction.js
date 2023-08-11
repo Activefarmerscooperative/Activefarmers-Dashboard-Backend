@@ -79,6 +79,8 @@ const loanDeduction = async () => {
                             amount,
                             type: "LoanDeduction",
                             status: "Successful",
+                            PaymentMethod:"Paystack",
+                            reference:data.reference,
                             message: "Loan deducted successfully",
                             item: loan._id,
                             checkModel: "Loan"
