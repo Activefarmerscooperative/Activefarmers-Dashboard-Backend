@@ -9,6 +9,7 @@ const UserCard = require("../models/cardDetails");
 const { Loan } = require("../models/loan");
 const SavingsCardDetails = require("../models/savingsCardDetails");
 const { ScheduledSavings } = require("../models/scheduledSavings");
+const crypto = require("crypto")
 
 exports.validatePayment = async (req, res) => {
 
@@ -32,7 +33,17 @@ exports.validatePayment = async (req, res) => {
             data: {}
         };
 
-        if (data.data.metadata?.type === "Validate Card" || data.data.metadata?.type === "Scheduled Savings Card") {
+        if (data.data.metadata?.type === "Validate Card") {
+            // Check if Card is Valid for Loan period
+            const cardIsValid = Card_Is_Valid(data.data)
+            if (!data.data.authorization.reusable || !cardIsValid) {
+                return res.status(StatusCodes.BAD_REQUEST).json({
+                    status: 'success',
+                    message: 'Your Card Does not meet the minimum required criteria please try another card.'
+                });
+            }
+            response.message = 'Your card validation was successful.';
+        } else if (data.data.metadata?.type === "Scheduled Savings Card") {
             response.message = 'Your card validation was successful.';
         } else {
             response.message = 'Your savings transaction was successful.';
@@ -101,10 +112,10 @@ exports.validatePayment = async (req, res) => {
 
         });
     } else if (data.data.metadata?.type === "Scheduled Savings Card") {
-        console.log(data.data.metadata.scheduledSavings)
+
         const scheduledSavings = await ScheduledSavings.findById(data.data.metadata.scheduledSavings)
             .exec();
-console.log(scheduledSavings)
+
         const savingsCard = new SavingsCardDetails({
             _id: new mongoose.Types.ObjectId(),
             user: scheduledSavings.user,
@@ -144,88 +155,86 @@ exports.validatePaymentByWebhook = async (req, res, next) => {
                 if (!data.status) return res.status(StatusCodes.BAD_REQUEST).json({ status: 'failed', error: data.message });
 
                 if (data.data.status !== 'success') return res.status(StatusCodes.BAD_REQUEST).json({ status: 'failed', error: 'Payment not completed' });
-
-                // const amount_paid = data.data.amount / 100;
-                const order = await Order.findById(data.data.metadata.order)
-                    .populate({
-                        path: 'address',
-                        model: 'Address',
-                        populate: [
-                            {
-                                path: 'state',
-                                model: 'State',
-                            },
-                            {
-                                path: 'country',
-                                model: 'Country',
-                            }]
-                    })
-                    .populate({
-                        path: 'items',
-                        model: 'OrderItem',
-                        populate: {
-                            path: 'product',
-                            model: 'Product',
-                            populate: [{
-                                path: 'unit',
-                                model: 'Unit',
-                            },
-                            {
-                                path: 'state',
-                                model: 'State',
-                            },
-                            {
-                                path: 'country',
-                                model: 'Country',
-                            }]
-                        }
-                    })
+                const amount_paid = data.data.amount / 100;
+                const savings = await Savings.findById(data.data.metadata.savings)
                     .exec();
 
-                // If this payment has already been verified maybe either by callbackUrl or hook prevent re-run wen page is refreshed
-                if (order.completed === true) {
-                    return res.sendStatus(200);
+                // If this payment has already been verified maybe either by callbackUrl or webhook prevent re-run wen page is refreshed
+                if (savings.status === "Confirmed") {
+
+                    return res.status(StatusCodes.OK);
                 }
-                //payment was successful, confirm the order
+                //payment was successful, confirm the payment
+                //make sure the amount paid and order total amount corresponds
+                if (savings.amount !== amount_paid) return res.status(StatusCodes.BAD_REQUEST).json({ status: 'failed', error: 'Amount paid does not match amount recorded' });
 
+                savings.status = 'Confirmed'
 
+                let updateSavings = await SavingsWallet.findOne({ user: savings.user })
 
-                // Each item in this order may belong to many sellers
-                // Update each item with the paymnt confirmation status.
-                await OrderItem.updateMany({ _id: { $in: order.items } },
-                    {
-                        $push: {
-                            status: {
-                                text: "Confirmed",
-                            }
-                        }
-                    });
-
-                order.payment = true;
-                order.completed = true;
-                order.status = 'In Progress';
-                await order.save();
-
-                const transaction = new Transaction({
-                    _id: new mongoose.Types.ObjectId(),
-                    type: 'order',
-                    amount: order.amount,
-                    payment_method: 'paystack',
-                    reference: data.data.reference,
-                    item: order._id
+                updateSavings.categories.map(item => {
+                    if (item.category === savings.category) {
+                        item.amount += savings.amount
+                        return item
+                    } else {
+                        return item
+                    }
                 })
 
+                const transaction = new Transaction({
+                    type: 'savings',
+                    user: savings.user,
+                    amount: savings.amount,
+                    payment_method: 'paystack',
+                    reference: data.data.reference,
+                    item: savings._id,
+                    checkModel: "Savings"
+                })
+                await updateSavings.save();
+                await savings.save()
                 await transaction.save();
-                const buyer = await User.findOne({ email: data.data.customer.email })
 
-                //empty cart
-                await Cart.deleteMany({ user: buyer._id }).exec();
+                if (data.data.metadata?.type === "Validate Card") {
+                    // Check if Card is Valid for Loan period
+                    const cardIsValid = Card_Is_Valid(data.data)
+                    if (!data.data.authorization.reusable || !cardIsValid) {
+                        return res.sendStatus(200);
+                    }
+                    const card = new UserCard({
+                        _id: new mongoose.Types.ObjectId(),
+                        user: savings.user,
+                        email: data.data.customer.email,
+                        authorization: data.data.authorization
+                    })
 
+                    await Loan.findOneAndUpdate({ user: savings.user, status: "Pending" }, {
+                        $set: {
+                            cardIsValid: true
+                        }
+                    }, {
+                        new: true
+                    })
+                    await card.save()
 
-                // Send Email message to Buyer
-                await orderCompleted(buyer, order)
+                } else if (data.data.metadata?.type === "Scheduled Savings Card") {
+
+                    const scheduledSavings = await ScheduledSavings.findById(data.data.metadata.scheduledSavings)
+                        .exec();
+
+                    const savingsCard = new SavingsCardDetails({
+                        _id: new mongoose.Types.ObjectId(),
+                        user: scheduledSavings.user,
+                        email: data.data.customer.email,
+                        authorization: data.data.authorization
+                    })
+                    await savingsCard.save();
+                    await ScheduledSavings.findByIdAndUpdate(scheduledSavings._id, {
+                        card: savingsCard._id,
+                        status: "Active"
+                    })
+
+                }
                 return res.sendStatus(200);
-
 
             }
 

@@ -5,6 +5,6 @@ const paymentController = require("../controller/paymentController")
 
 const auth = require("../middleware/auth")
 
-// router.post('/', paymentController.validatePaymentByWebhook);
+router.post('/', paymentController.validatePaymentByWebhook);
 router.post('/validate', auth, paymentController.validatePayment);
 module.exports = router; 

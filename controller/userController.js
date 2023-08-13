@@ -23,6 +23,7 @@ const { Card_Is_Valid } = require("../utils/checkValidCard")
 const cloudinary = require("../utils/cloudinary");
 const { ScheduledSavings } = require("../models/scheduledSavings");
 const SavingsCardDetails = require("../models/savingsCardDetails");
+const AdminNotification = require("../models/adminNotification");
 
 exports.getUser = async (req, res) => {
   const user = await User.findById(req.user._id)
@@ -141,6 +142,13 @@ exports.verify_token = async (req, res) => {
       categories
     })
     await userSavingsWallet.save()
+
+    const notifyAdmin = new AdminNotification({
+      user: user._id,
+      type: "Registration"
+    })
+
+    await notifyAdmin.save()
     return res.status(StatusCodes.OK).json({ message: 'User Registered successfully' })
   } else if (result?.verified === "Expired") {
     res.status(StatusCodes.UNPROCESSABLE_ENTITY).json({ message: "token Expired." });
@@ -825,6 +833,13 @@ exports.savings_withdrawal = async (req, res) => {
   await newWithdrawal.save()
   await transaction.save();
 
+  const notifyAdmin = new AdminNotification({
+    user: req.user._id,
+    type: "Withdrawal"
+  })
+
+  await notifyAdmin.save()
+
   return res.status(StatusCodes.OK).json({
     status: 'success',
     message: 'Your withdrawal request was successful and awaiting admin approval.'
@@ -1167,6 +1182,13 @@ exports.loan_request = async (req, res) => {
     if (!findCard) {
       await newLoan.save()
       await transaction.save();
+
+      const notifyAdmin = new AdminNotification({
+        user: req.user._id,
+        type: "Loan"
+      })
+
+      await notifyAdmin.save()
       return res.status(StatusCodes.PERMANENT_REDIRECT).json({
         status: 'success',
         message: 'To complete your Loan request please enter a valid Debit card.'
@@ -1179,6 +1201,12 @@ exports.loan_request = async (req, res) => {
     if (!findCard.authorization.reusable || !cardIsValid) {
       await newLoan.save()
       await transaction.save();
+      const notifyAdmin = new AdminNotification({
+        user: req.user._id,
+        type: "Loan"
+      })
+    
+      await notifyAdmin.save()
       return res.status(StatusCodes.BAD_REQUEST).json({
         status: 'success',
         message: 'Your Saved Card Does not meet the minimum required criteria please try another card.'
@@ -1192,6 +1220,12 @@ exports.loan_request = async (req, res) => {
     // newLoan.cardIsValid = true;
     await newLoan.save()
     await transaction.save();
+    const notifyAdmin = new AdminNotification({
+      user: req.user._id,
+      type: "Loan"
+    })
+
+    await notifyAdmin.save()
     return res.status(StatusCodes.TEMPORARY_REDIRECT).json({
       status: 'validate_card',
       message: `To complete your Loan request, please confirm validity of your ${bank} ${brand} card number **** **** ${last4}.`,
@@ -1201,6 +1235,13 @@ exports.loan_request = async (req, res) => {
 
   await newLoan.save()
   await transaction.save();
+
+  const notifyAdmin = new AdminNotification({
+    user: req.user._id,
+    type: "Loan"
+  })
+
+  await notifyAdmin.save()
   return res.status(StatusCodes.OK).json({
     status: 'success',
     message: 'Your Loan request was successful and awaiting admin approval.'
@@ -1327,6 +1368,7 @@ exports.validate_saved_card = async (req, res) => {
     _id: new mongoose.Types.ObjectId(),
     user: _id,
     amount,
+    status: "Confirmed",
     category: savingsCategory.name,
     reference: refID
   })
@@ -1392,7 +1434,7 @@ exports.cancel_loan_request = async (req, res) => {
 }
 
 exports.my_loan = async (req, res) => {
-  const hasLoan = await Loan.findOne({ user: req.user._id, status: 'Pending', }).exec()
+  const hasLoan = await Loan.findOne({ user: req.user._id, status: 'Confirmed', }).exec()
 
   return res.status(StatusCodes.OK).json({
     status: "success",

@@ -20,12 +20,18 @@ const session = require('mongoose').startSession;
 const cloudinary = require("../utils/cloudinary");
 const Payout = require('../models/adminPayout');
 const CronJob = require('../models/cronJob');
+const AdminNotification = require('../models/adminNotification');
 
 exports.getUser = async (req, res) => {
     const admin = await Admin.findById(req.user._id)
         .select("-password -isVerified -resetPassword -resendOTP")
         .populate("location", "_id name");
     res.status(StatusCodes.OK).json(admin);
+}
+
+exports.getNotifications = async (req, res) => {
+    const notifications = await AdminNotification.find().sort({createdAt:-1}).populate("user","firstname surname")
+    res.status(StatusCodes.OK).json(notifications);
 }
 
 exports.registerAdmin = async (req, res) => {
@@ -735,10 +741,10 @@ exports.createSavingsCategory = async (req, res) => {
 
 exports.cronJobs = async (req, res) => {
     const results = await CronJob.find()
-    .sort({createdAt:-1})
-    .populate("user", "firstname surname phone")
-    .exec()
+        .sort({ createdAt: -1 })
+        .populate("user", "firstname surname phone")
+        .exec()
 
-    res.status(StatusCodes.OK).json({ status:"success",results })
+    res.status(StatusCodes.OK).json({ status: "success", results })
 
 }

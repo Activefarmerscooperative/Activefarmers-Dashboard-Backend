@@ -15,6 +15,9 @@ router.get('/', async (req, res) => {
 //  Get the current user.
 router.get('/me', auth, adminController.getUser)
 
+//  Get the current user.
+router.get('/notifications', auth, adminController.getNotifications)
+
 router.post('/', validate(validateAdmin), adminController.registerAdmin);
 
 // Verify OTP
