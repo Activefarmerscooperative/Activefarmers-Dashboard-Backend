@@ -16,20 +16,19 @@ require("./startup/db")();
 // cron.schedule('0 0 * * *', () => {
 //   loanDeduction()
 // });
-// cron.schedule('* * * * *', () => {
-//   console.log("running every minute")
-//   loanDeduction()
+cron.schedule('0 * * * *', () => {
+  console.log("running every hour");
+  loanDeduction();
+});
+cron.schedule('0 * * * *', () => {
+  console.log("running every now and den")
+  resetCron()
+});
+cron.schedule('0 * * * *', () => {
+  console.log("running every hour");
+  scheduledSavingsDeduction()
 
-// });
-// cron.schedule('* * * * *', () => {
-//   console.log("running every now and den")
-//   resetCron()
-// });
-// cron.schedule('* * * * *', () => {
-//   console.log("running every minute");
-//   scheduledSavingsDeduction()
-
-// });
+});
 require("./startup/routes")(app);
 
 // require("./startup/validation")();
