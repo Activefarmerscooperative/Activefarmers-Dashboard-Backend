@@ -156,8 +156,15 @@ exports.validatePaymentByWebhook = async (req, res, next) => {
 
                 if (data.data.status !== 'success') return res.status(StatusCodes.BAD_REQUEST).json({ status: 'failed', error: 'Payment not completed' });
                 const amount_paid = data.data.amount / 100;
+       
+
                 const savings = await Savings.findById(data.data.metadata.savings)
                     .exec();
+        
+                    // This was a charge authorization.
+                if (!savings) {
+                    return res.sendStatus(200);
+                }
 
                 // If this payment has already been verified maybe either by callbackUrl or webhook prevent re-run wen page is refreshed
                 if (savings.status === "Confirmed") {

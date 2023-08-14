@@ -8,6 +8,7 @@ const { Loan } = require("../../models/loan")
 const loanDeduction = async () => {
 
     try {
+        //ToDo: The Loan deduction is done by repayment date.
         const loans = await Loan.find({ status: "Confirmed", repaymentStatus: "Ongoing", cronStatus: { $ne: "Successful" } });
 
         for (let i = 0; i < loans.length; i++) {
