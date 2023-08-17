@@ -13,22 +13,23 @@ app.use(morgan('tiny'));
 require("./startup/cors.js")(app);
 require("./startup/db")();
 
-// cron.schedule('0 0 * * *', () => {
-//   loanDeduction()
-// });
-cron.schedule('0 * * * *', () => {
-  console.log("running every hour");
+
+cron.schedule('0 0 * * *', () => {
+  console.log("Running at midnight every day");
+  scheduledSavingsDeduction();
+});
+
+cron.schedule('0 2 * * *', () => {
+  console.log("Running at 2 AM every day");
   loanDeduction();
 });
-cron.schedule('0 * * * *', () => {
-  console.log("running every now and den")
-  resetCron()
-});
-cron.schedule('0 * * * *', () => {
-  console.log("running every hour");
-  scheduledSavingsDeduction()
 
+// reset ongoing loan to initiated so deduction can be made for the current mth.
+cron.schedule('0 1 1 * *', () => {
+  console.log("Running at 1 AM on the 1st day of the month");
+  resetCron();
 });
+
 require("./startup/routes")(app);
 
 // require("./startup/validation")();
