@@ -4,9 +4,6 @@ const config = require("../config.js/keys");
 const path = require('path');
 // const smtpTransport = require('nodemailer-smtp-transport');
 
-
-
-
 exports.Otp_VerifyAccount = async (email, name, otp) => {
   try {
     const transporter = nodemailer.createTransport({
