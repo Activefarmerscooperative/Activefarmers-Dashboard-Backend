@@ -9,7 +9,10 @@ const loanDeduction = async () => {
 
     try {
         //ToDo: The Loan deduction is done by repayment date.
-        const loans = await Loan.find({ status: "Confirmed", repaymentStatus: "Ongoing", cronStatus: { $ne: "Successful" } });
+        const loans = await Loan.find({
+            status: "Confirmed", repaymentStatus: "Ongoing",
+            // cronStatus: { $ne: "Successful" } 
+        });
 
         for (let i = 0; i < loans.length; i++) {
             let loan = loans[i];
@@ -43,7 +46,7 @@ const loanDeduction = async () => {
                 await loan.save()
                 await cronNotification.save();
             } else {
-         
+
                 // Charge the user Card
                 let authorization_code = findCard.authorization.authorization_code;
                 let email = findCard.email;
@@ -80,8 +83,8 @@ const loanDeduction = async () => {
                             amount,
                             type: "LoanDeduction",
                             status: "Successful",
-                            PaymentMethod:"Paystack",
-                            reference:data.reference,
+                            PaymentMethod: "Paystack",
+                            reference: data.reference,
                             message: "Loan deducted successfully",
                             item: loan._id,
                             checkModel: "Loan"

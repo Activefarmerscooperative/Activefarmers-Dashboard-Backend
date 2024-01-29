@@ -8,7 +8,13 @@ const loanSchema = mongoose.Schema({
     savings: { type: Number, required: false },
     status: {
         type: String,
-        enum: ['Pending', 'Confirmed', "Rejected", "Cancelled"],//User can cancel loan before it's approved.
+        enum: ['Pending', "In progress", 'Confirmed', "Rejected", "Cancelled"],//User can cancel loan before it's approved.
+        default: 'Pending'
+    },
+
+    paymentStatus: {
+        type: String,
+        enum: ['Pending', 'success', "failed", "reversed"],//This response from paystack after transfer is done
         default: 'Pending'
     },
     repaymentMethod: {
@@ -36,7 +42,7 @@ const loanSchema = mongoose.Schema({
         },
         timestamp: { type: Date, 'default': Date.now }
     }],
-    cronStatus:{
+    cronStatus: {
         type: String,
         enum: ["Initiated", "Failed", "Successful"]
     },

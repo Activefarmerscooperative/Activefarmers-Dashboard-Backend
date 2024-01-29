@@ -73,9 +73,9 @@ router.post('/savings', auth, userController.add_savings);
 
 router.post('/savings/withdrawal', auth, userController.savings_withdrawal);
 
-router.post('/scheduled-savings', auth,validate(scheduledSavingsValidator), userController.add_scheduled_savings);
+router.post('/scheduled-savings', auth, validate(scheduledSavingsValidator), userController.add_scheduled_savings);
 
-router.put('/scheduled-savings/:id', auth,validate(scheduledSavingsValidator), userController.edit_scheduled_savings);
+router.put('/scheduled-savings/:id', auth, validate(scheduledSavingsValidator), userController.edit_scheduled_savings);
 
 router.patch('/scheduled-savings/:id', auth, userController.edit_scheduled_savings);
 

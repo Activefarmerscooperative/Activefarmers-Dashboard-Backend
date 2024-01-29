@@ -156,12 +156,12 @@ exports.validatePaymentByWebhook = async (req, res, next) => {
 
                 if (data.data.status !== 'success') return res.status(StatusCodes.BAD_REQUEST).json({ status: 'failed', error: 'Payment not completed' });
                 const amount_paid = data.data.amount / 100;
-       
+
 
                 const savings = await Savings.findById(data.data.metadata.savings)
                     .exec();
-        
-                    // This was a charge authorization.
+
+                // This was a charge authorization.
                 if (!savings) {
                     return res.sendStatus(200);
                 }
@@ -243,6 +243,8 @@ exports.validatePaymentByWebhook = async (req, res, next) => {
                 }
                 return res.sendStatus(200);
 
+            } else {
+                console.log(event)
             }
 
         } else {

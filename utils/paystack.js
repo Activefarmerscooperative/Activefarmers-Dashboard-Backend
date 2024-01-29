@@ -1,7 +1,7 @@
 const dotenv = require("dotenv");
-const {PAYSTACK_SECRET_KEY } = require('../config.js/keys')
+const { PAYSTACK_SECRET_KEY } = require('../config.js/keys')
 dotenv.config();
-
+const axios = require('axios');
 const paystack = require("paystack")(PAYSTACK_SECRET_KEY);
 const paystack_api = require("paystack-api")(PAYSTACK_SECRET_KEY);
 
@@ -27,11 +27,11 @@ exports.initiatePaystackCardValidation = async (amount, email, name, savings) =>
     amount: amount * 100,
     email: email,
     name: name,
-    channels:['card'],
+    channels: ['card'],
     metadata: {
-      type:"Validate Card",
+      type: "Validate Card",
       savings,
-      
+
     }
   };
 
@@ -41,17 +41,17 @@ exports.initiatePaystackCardValidation = async (amount, email, name, savings) =>
 };
 
 //Validate users card for Loan application.
-exports.initiatePaystackScheduledCardValidation = async (amount, email, name, savings,scheduledSavings) => {
+exports.initiatePaystackScheduledCardValidation = async (amount, email, name, savings, scheduledSavings) => {
   const params = {
     amount: amount * 100,
     email: email,
     name: name,
-    channels:['card'],
+    channels: ['card'],
     metadata: {
-      type:"Scheduled Savings Card",
+      type: "Scheduled Savings Card",
       scheduledSavings,
       savings,
-      
+
     }
   };
 
@@ -99,18 +99,18 @@ exports.initiatePaystackWithdrawal = async (
 
 exports.verifyAccount = async (account_number, bank_code) => {
 
-try {
-  const params = {
-    account_number,
-    bank_code
-  }
-  const data = await paystack_api.verification.resolveAccount(params);
-  // console.log({params:data});
+  try {
+    const params = {
+      account_number,
+      bank_code
+    }
+    const data = await paystack_api.verification.resolveAccount(params);
+    // console.log({params:data});
 
-  return data;
-} catch (error) {
-  return error.error
-}
+    return data;
+  } catch (error) {
+    return error.error
+  }
 
 };
 
@@ -132,20 +132,33 @@ exports.createTransferRecip = async (account_name, account_number, bank_code) =>
 
 
 
-exports.initiateTransfer = async (amount, recipient_code,reference, reason) => {
+exports.initiateTransfer = async (amount, recipient_code, reference, reason) => {
+  console.log(recipient_code, reference)
   const params = {
-    source: "balance",
-    amount: amount * 100,
-    recipient: recipient_code,
+    "source": "balance",
+    "amount": amount * 100,
+    "reference": `${reference}`,
+    "recipient": `${recipient_code}`,
     // reference,
-    reason: reason ? reason : "Transfer made from my Wallet Account",
+    "reason": reason ? reason : "Transfer made from my Wallet Account",
 
   }
-  const data = await paystack_api.transfer.create(params);
-  // console.log({params});
 
+  try {
+    const response = await axios.post('https://api.paystack.co/transfer', params, {
+      headers: {
+        Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    });
 
-  return data;
+    return response.data
+
+  } catch (error) {
+
+    return error.response.data
+  }
+
 };
 
 exports.bankList = async () => {

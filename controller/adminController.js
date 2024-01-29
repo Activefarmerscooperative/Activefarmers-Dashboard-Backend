@@ -30,7 +30,7 @@ exports.getUser = async (req, res) => {
 }
 
 exports.getNotifications = async (req, res) => {
-    const notifications = await AdminNotification.find().sort({createdAt:-1}).populate("user","firstname surname")
+    const notifications = await AdminNotification.find().sort({ createdAt: -1 }).populate("user", "firstname surname")
     res.status(StatusCodes.OK).json(notifications);
 }
 
@@ -585,10 +585,10 @@ exports.handleLoanApproval = async (req, res) => {
             error: "Loan not found.",
         });
 
-        if (loan.status === "Confirmed") return res.status(StatusCodes.UNPROCESSABLE_ENTITY).json({
-            status: "failed",
-            error: "Loan already approved.",
-        });
+        // if (loan.status === "Confirmed") return res.status(StatusCodes.UNPROCESSABLE_ENTITY).json({
+        //     status: "failed",
+        //     error: "Loan already approved.",
+        // });
 
         const userBankDetails = await BankDetails.findOne({ user: loan.user })
         if (!userBankDetails) return res.status(StatusCodes.UNPROCESSABLE_ENTITY).json({
@@ -609,11 +609,21 @@ exports.handleLoanApproval = async (req, res) => {
         loan.adminActionBy = req.user._id
         loan.status = "Confirmed"
 
+        const response = await initiateTransfer(loan.amount, data.recipient_code, loan._id, "Test")
+        console.log(response)
+        if (response.data.status !== "success") {
+            return res.status(StatusCodes.UNPROCESSABLE_ENTITY).json({
+                status: "failed",
+                error: "Cannot complete transaction. Something went wrong.",
+            });
+        }
+        // loan.paymentStatus = response.
+
         await Promise.all([transferRecipient.save({ session }), loan.save({ session })]);
 
         await session.commitTransaction();
         session.endSession();
-        res.status(StatusCodes.OK).json({ message: 'Loan approval successful.' });
+        res.status(StatusCodes.OK).json({ message: 'Loan approval successful.', response });
     } catch (error) {
         await session.abortTransaction();
         session.endSession();
@@ -723,7 +733,7 @@ exports.handlePaymentTransfer = async (req, res) => {
         error: "No Pending transfer for this Loan found.",
     });
 
-    const data = initiateTransfer(transferRecipient.item.amount, transferRecipient.transferRecipient.recipient_code, transferRecipient.item.reference, "Loan Disbursement")
+    const data = await initiateTransfer(transferRecipient.item.amount, transferRecipient.transferRecipient.recipient_code, transferRecipient.item.reference, "Test")
 
     res.status(StatusCodes.OK).json({ message: `Transfer initiated successfully.`, data })
 }

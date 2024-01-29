@@ -830,6 +830,7 @@ exports.savings_withdrawal = async (req, res) => {
     item: newWithdrawal._id,
     checkModel: "SavingsWithdrawal"
   })
+
   await newWithdrawal.save()
   await transaction.save();
 
@@ -845,6 +846,7 @@ exports.savings_withdrawal = async (req, res) => {
     message: 'Your withdrawal request was successful and awaiting admin approval.'
   });
 }
+
 exports.add_scheduled_savings = async (req, res) => {
 
   const { amount, category, newCategory, date } = req.body;
@@ -1205,7 +1207,7 @@ exports.loan_request = async (req, res) => {
         user: req.user._id,
         type: "Loan"
       })
-    
+
       await notifyAdmin.save()
       return res.status(StatusCodes.BAD_REQUEST).json({
         status: 'success',
@@ -1434,7 +1436,7 @@ exports.cancel_loan_request = async (req, res) => {
 }
 
 exports.my_loan = async (req, res) => {
-  const hasLoan = await Loan.findOne({ user: req.user._id, status: 'Confirmed', }).exec()
+  const hasLoan = await Loan.findOne({ user: req.user._id, status: 'Confirmed', repaymentStatus: "Ongoing" }).exec()
 
   return res.status(StatusCodes.OK).json({
     status: "success",
