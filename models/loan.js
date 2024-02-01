@@ -8,7 +8,7 @@ const loanSchema = mongoose.Schema({
     savings: { type: Number, required: false },
     status: {
         type: String,
-        enum: ['Pending', "In progress", 'Confirmed', "Rejected", "Cancelled"],//User can cancel loan before it's approved.
+        enum: ['Pending', "In Progress", 'Confirmed', "Rejected", "Cancelled"],//User can cancel loan before it's approved.
         default: 'Pending'
     },
 

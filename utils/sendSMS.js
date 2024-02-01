@@ -26,13 +26,13 @@ exports.Register_OTP = async (phone) => {
     }
 };
 
-exports.Veriify_OTP = async (token,pinId) => {
+exports.Veriify_OTP = async (token, pinId) => {
 
     var data = {
         "pin_id": pinId,
         "pin": token,
         "api_key": TERMII_API_KEY,
-      };
+    };
     //   var options = {
     //     'method': 'POST',
     //     'url': "https://api.ng.termii.com/api/sms/otp/verify",
@@ -40,7 +40,7 @@ exports.Veriify_OTP = async (token,pinId) => {
     //       'Content-Type': ['application/json', 'application/json']
     //     },
     //     body: JSON.stringify(data)
-    
+
     //   };
     //   let result;
     //   request(options, function (error, response) {
@@ -48,12 +48,12 @@ exports.Veriify_OTP = async (token,pinId) => {
     //     console.log(response.body);
     //     result = response.body
     //   });
-      try {
+    try {
         const response = await axios.post('https://api.ng.termii.com/api/sms/otp/verify', data);
         // console.log(response)
         return response.data
 
-    } catch (error) {     
+    } catch (error) {
         return error.response.data
     }
 

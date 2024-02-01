@@ -5,30 +5,30 @@ const mongoose = require("mongoose");
 const adminSchema = new mongoose.Schema({
 
     surname: {
-      type: String,
-      required: true,
-      minlength: 2,
-      maxlength: 250
+        type: String,
+        required: true,
+        minlength: 2,
+        maxlength: 250
     },
     firstname: {
-      type: String,
-      required: true,
-      minlength: 2,
-      maxlength: 250
+        type: String,
+        required: true,
+        minlength: 2,
+        maxlength: 250
     },
     email: {
-      type: String,
-      required: true,
-      minlength: 5,
-      maxlength: 255,
-      unique: true,
-      match: /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
+        type: String,
+        required: true,
+        minlength: 5,
+        maxlength: 255,
+        unique: true,
+        match: /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
     },
     gender: {
-      type: String,
-      required: true,
-      minlength: 3,
-      maxlength: 20,
+        type: String,
+        required: true,
+        minlength: 3,
+        maxlength: 20,
     },
     location: {
         type: mongoose.Schema.Types.ObjectId, required: true, ref: 'State'
@@ -67,7 +67,7 @@ const adminSchema = new mongoose.Schema({
     adminType: {
         type: String,
         required: true,
-        default:"Admin",
+        default: "Admin",
         enum: ["Super-Admin", "Admin"]
     },
 
@@ -107,7 +107,7 @@ adminSchema.methods.generateAuthToken = function () {
         },
         process.env.JWT,
         {
-            expiresIn: "1d",
+            expiresIn: "20m",
         }
     );
     return token;

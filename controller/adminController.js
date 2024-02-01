@@ -495,8 +495,9 @@ exports.getWithdrawalRequest = async (req, res) => {
         })
         .sort({ createdAt: -1 })
         .exec();
+
     for (let i = 0; i < users.length; i++) {
-        const userWallets = await SavingsWallet.findOne({ user: users[i].user._id })
+        const userWallets = await SavingsWallet.findOne({ user: users[i].user?._id })
             .exec()
         const totalSaving = userWallets.categories.reduce((total, category) => total + category.amount, 0);
 
@@ -585,10 +586,10 @@ exports.handleLoanApproval = async (req, res) => {
             error: "Loan not found.",
         });
 
-        // if (loan.status === "Confirmed") return res.status(StatusCodes.UNPROCESSABLE_ENTITY).json({
-        //     status: "failed",
-        //     error: "Loan already approved.",
-        // });
+        if (loan.status === "Confirmed") return res.status(StatusCodes.UNPROCESSABLE_ENTITY).json({
+            status: "failed",
+            error: "Loan already approved.",
+        });
 
         const userBankDetails = await BankDetails.findOne({ user: loan.user })
         if (!userBankDetails) return res.status(StatusCodes.UNPROCESSABLE_ENTITY).json({
@@ -599,6 +600,7 @@ exports.handleLoanApproval = async (req, res) => {
         const { data } = await createTransferRecip(userBankDetails.accountName, userBankDetails.accountNumber, userBankDetails.bankCode)
 
         const transferRecipient = new TransferRecipient({
+            _id: new mongoose.Types.ObjectId(),
             user: loan.user,
             transferRecipient: data,
             type: "Loan",
@@ -607,10 +609,18 @@ exports.handleLoanApproval = async (req, res) => {
         })
 
         loan.adminActionBy = req.user._id
-        loan.status = "Confirmed"
+        loan.status = "In Progress"
 
-        const response = await initiateTransfer(loan.amount, data.recipient_code, loan._id, "Test")
+        const response = await initiateTransfer(loan.amount, data.recipient_code, loan._id, "Loan")
         console.log(response)
+
+        if (response.status === false) {
+            return res.status(StatusCodes.UNPROCESSABLE_ENTITY).json({
+                status: "failed",
+                error: response.message,
+            });
+        }
+
         if (response.data.status !== "success") {
             return res.status(StatusCodes.UNPROCESSABLE_ENTITY).json({
                 status: "failed",
@@ -618,8 +628,19 @@ exports.handleLoanApproval = async (req, res) => {
             });
         }
         // loan.paymentStatus = response.
+        transferRecipient.transferData = response.data
 
-        await Promise.all([transferRecipient.save({ session }), loan.save({ session })]);
+        // initiate admin payout here.
+        const payout = new Payout({
+            type: "Loan",
+            reference: transferRecipient._id,
+            amount: loan.amount,
+            admin: req.user._id,
+            payment_method: "Cash Transfer",
+            item: loan._id,
+            checkModel: "Loan"
+        })
+        await Promise.all([transferRecipient.save({ session }), loan.save({ session }), payout.save()]);
 
         await session.commitTransaction();
         session.endSession();
@@ -657,7 +678,8 @@ exports.handleWithdrawalRejection = async (req, res) => {
 }
 
 exports.handleWithdrawalApproval = async (req, res) => {
-
+    const session = await mongoose.startSession();
+    session.startTransaction();
     //Loan request was declined
     const withdrawal = await SavingsWithdrawal.findById(req.params.id)
 
@@ -695,27 +717,74 @@ exports.handleWithdrawalApproval = async (req, res) => {
         error: "User have Insufficient funds in the requested category.",
     });
 
-    // Approve request
-    //ToDo: Initiate Paystack transfer here.
-    // Session Transaction in this model
+    const userBankDetails = await BankDetails.findOne({ user: withdrawal.user })
+    if (!userBankDetails) return res.status(StatusCodes.UNPROCESSABLE_ENTITY).json({
+        status: "failed",
+        error: "Cannot complete transaction. No user bank account details found.",
+    });
 
-    withdrawal.status = "Confirmed"
+    const { data } = await createTransferRecip(userBankDetails.accountName, userBankDetails.accountNumber, userBankDetails.bankCode)
+
+    const transferRecipient = new TransferRecipient({
+        _id: new mongoose.Types.ObjectId(),
+        user: withdrawal.user,
+        transferRecipient: data,
+        type: "SavingsWithdrawal",
+        item: withdrawal._id,
+        checkModel: "SavingsWithdrawal"
+    })
+
+    withdrawal.adminActionBy = req.user._id
+    withdrawal.status = "In Progress"
+
+    const response = await initiateTransfer(withdrawal.amount, data.recipient_code, withdrawal._id, "Withdrawal")
+
+    if (response.status === false) {
+        return res.status(StatusCodes.UNPROCESSABLE_ENTITY).json({
+            status: "failed",
+            error: response.message,
+        });
+    }
+
+    if (response.data.status !== "success") {
+        return res.status(StatusCodes.UNPROCESSABLE_ENTITY).json({
+            status: "failed",
+            error: "Cannot complete transaction. Something went wrong.",
+        });
+    }
+    // loan.paymentStatus = response.
+    transferRecipient.transferData = response.data
 
     // initiate admin payout here.
     const payout = new Payout({
         type: "SavingsWithdrawal",
         amount: withdrawal.amount,
+        reference: transferRecipient._id,
         admin: req.user._id,
         payment_method: "Cash Transfer",
         item: withdrawal._id,
         checkModel: "SavingsWithdrawal"
     })
+
+    // Deduct withdrawal amount from user wallet
+    userWallet.categories.map(item => {
+        if (item.category === withdrawal.category) {
+            item.amount -= withdrawal.amount
+            return item
+        } else {
+            return item
+        }
+    })
+
+    await userWallet.save()
+    await transferRecipient.save()
     await withdrawal.save()
     await payout.save()
 
     return res.status(StatusCodes.OK).json({
         status: 'success',
-        message: 'Withdrawal Request approved successfully.'
+        message: 'Withdrawal Request approved successfully.',
+
     });
 }
 
@@ -724,18 +793,41 @@ exports.transferRequests = async (req, res) => {
     res.status(StatusCodes.OK).json({ message: `Successful`, requests })
 }
 
-exports.handlePaymentTransfer = async (req, res) => {
-    const transferRecipient = await TransferRecipient.findOne({ item: req.params.id, status: "Pending" })
-        .populate("item")
-        .exec()
-    if (!transferRecipient) return res.status(StatusCodes.BAD_REQUEST).json({
+const handlePaymentTransfer = async (user, transferType, item) => {
+    const userBankDetails = await BankDetails.findOne({ user })
+    if (!userBankDetails) return res.status(StatusCodes.UNPROCESSABLE_ENTITY).json({
         status: "failed",
-        error: "No Pending transfer for this Loan found.",
+        error: "Cannot complete transaction. No user bank account details found.",
     });
 
-    const data = await initiateTransfer(transferRecipient.item.amount, transferRecipient.transferRecipient.recipient_code, transferRecipient.item.reference, "Test")
+    const { data } = await createTransferRecip(userBankDetails.accountName, userBankDetails.accountNumber, userBankDetails.bankCode)
 
-    res.status(StatusCodes.OK).json({ message: `Transfer initiated successfully.`, data })
+    const transferRecipient = new TransferRecipient({
+        user,
+        transferRecipient: data,
+        type: transferType,
+        item: item._id,
+        checkModel: transferType
+    })
+
+    const response = await initiateTransfer(item.amount, data.recipient_code, item._id, transferType)
+
+    if (response.status === false) {
+        return res.status(StatusCodes.UNPROCESSABLE_ENTITY).json({
+            status: "failed",
+            error: response.message,
+        });
+    }
+
+    if (response.data.status !== "success") {
+        return res.status(StatusCodes.UNPROCESSABLE_ENTITY).json({
+            status: "failed",
+            error: "Cannot complete transaction. Something went wrong.",
+        });
+    }
+    // loan.paymentStatus = response.
+    transferRecipient.transferData = response.data
+    return transferRecipient
 }
 
 exports.createSavingsCategory = async (req, res) => {

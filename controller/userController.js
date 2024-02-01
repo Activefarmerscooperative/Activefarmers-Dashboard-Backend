@@ -159,6 +159,7 @@ exports.verify_token = async (req, res) => {
 }
 
 exports.confirmAFCSToken = async (req, res) => {
+
   return res.status(StatusCodes.OK).json({
     status: 'success',
     user: req.user
@@ -188,6 +189,17 @@ exports.loginUser = async (req, res) => {
 
 exports.resend_otp = async (req, res) => {
   const { type } = req.query
+
+  if (type === "signup") {
+    const result = await Register_OTP(req.user.phone)
+    return res
+      .status(StatusCodes.OK).json({
+        status: "success",
+        message: `Enter the verification code sent to ${req.user.phone} in order to verify your account`,
+        pinId: result?.pinId || null,
+        // afcsToken: token
+      });
+  }
   //delete any existing otp
   await OTP.findOneAndDelete({ user: req.user._id }).exec();
 

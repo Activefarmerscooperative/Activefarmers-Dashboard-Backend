@@ -195,7 +195,8 @@ userSchema.methods.generateAuthToken = function () {
     },
     process.env.JWT,
     {
-      expiresIn: "1d",
+      // expiresIn: "1d",
+      expiresIn: "15m",
     }
   );
   return token;

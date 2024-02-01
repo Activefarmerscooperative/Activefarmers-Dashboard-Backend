@@ -9,7 +9,9 @@ const UserCard = require("../models/cardDetails");
 const { Loan } = require("../models/loan");
 const SavingsCardDetails = require("../models/savingsCardDetails");
 const { ScheduledSavings } = require("../models/scheduledSavings");
-const crypto = require("crypto")
+const crypto = require("crypto");
+const Transfer = require("../models/transfer");
+const SavingsWithdrawal = require("../models/savingsWithdrawal");
 
 exports.validatePayment = async (req, res) => {
 
@@ -141,6 +143,7 @@ exports.validatePayment = async (req, res) => {
 }
 
 exports.validatePaymentByWebhook = async (req, res, next) => {
+    console.log("yeah")
     try {
         const hash = crypto.createHmac('sha512', process.env.PAYSTACK_SECRET_KEY).update(JSON.stringify(req.body)).digest('hex');
 
@@ -243,8 +246,163 @@ exports.validatePaymentByWebhook = async (req, res, next) => {
                 }
                 return res.sendStatus(200);
 
-            } else {
-                console.log(event)
+            } else if (event.event == 'transfer.success') {
+
+                if (event.data.status !== 'success') return res.status(StatusCodes.BAD_REQUEST).json({ status: 'failed', error: 'Payment not completed' });
+
+                if (event.data.reason === "Loan") {
+
+                    const loan = await Loan.findById(event.data.reference)
+                        .exec();
+
+                    if (!loan) {
+                        return res.sendStatus(200);
+                    }
+
+                    // If this payment has already been verified maybe either by callbackUrl or webhook prevent re-run wen page is refreshed
+                    if (loan.status === "Confirmed") {
+
+                        return res.status(StatusCodes.OK);
+                    }
+                    event.data.amount = event.data.amount / 100
+
+                    loan.status = 'Confirmed'
+                    loan.paymentStatus = event.data.status
+
+                    const updateTransferPromise = Transfer.findOneAndUpdate(
+                        { item: loan._id },
+                        {
+                            $set: {
+                                status: event.data.status,
+                                transferData: event.data,
+                            },
+                        }
+                    ).exec();
+
+                    const updateLoanPromise = loan.save();
+
+                    // Use Promise.all to wait for both promises to resolve
+                    await Promise.all([updateTransferPromise, updateLoanPromise]);
+                    return res.sendStatus(200);
+                } else if (event.data.reason === "Withdrawal") {
+                    const withdrawal = await SavingsWithdrawal.findById(event.data.reference).exec();
+
+                    if (!withdrawal) {
+                        return res.sendStatus(200);
+                    }
+
+                    // If this payment has already been verified, prevent re-run when the page is refreshed
+                    if (withdrawal.status === "Confirmed") {
+                        console.log("Withdrawal already confirmed");
+                        return res.status(StatusCodes.OK).send("Withdrawal already confirmed");
+                    }
+
+                    event.data.amount = event.data.amount / 100;
+
+                    console.log("Updating withdrawal status to 'Confirmed'");
+                    withdrawal.status = 'Confirmed';
+                    withdrawal.paymentStatus = event.data.status;
+
+                    console.log("Updating Transfer document");
+                    await Transfer.findOneAndUpdate(
+                        { item: withdrawal._id },
+                        {
+                            $set: {
+                                status: event.data.status,
+                                transferData: event.data,
+                            },
+                        }
+                    ).exec();
+
+                    console.log("Saving withdrawal");
+                    await withdrawal.save();
+
+                    return res.sendStatus(200);
+                }
+
+            } else if (event.event == 'transfer.failed' || event.event == 'transfer.reversed') {
+
+                if (event.data.reason === "Loan") {
+
+                    const loan = await Loan.findById(event.data.reference)
+                        .exec();
+
+                    if (!loan) {
+                        return res.sendStatus(200);
+                    }
+
+                    // If this payment has already been verified maybe either by callbackUrl or webhook prevent re-run wen page is refreshed
+                    if (loan.status === "Confirmed") {
+
+                        return res.status(StatusCodes.OK);
+                    }
+                    event.data.amount = event.data.amount / 100
+
+
+                    loan.status = 'Confirmed'
+                    loan.paymentStatus = event.data.status
+
+                    const updateTransferPromise = Transfer.findOneAndUpdate(
+                        { item: loan._id },
+                        {
+                            $set: {
+                                status: event.data.status,
+                                transferData: event.data,
+                            },
+                        }
+                    ).exec();
+
+                    const updateLoanPromise = loan.save();
+
+                    // Use Promise.all to wait for both promises to resolve
+                    await Promise.all([updateTransferPromise, updateLoanPromise]);
+                    return res.sendStatus(200);
+                } else if (event.data.reason === "Withdrawal") {
+
+                    const withdrawal = await SavingsWithdrawal.findById(event.data.reference)
+                        .exec();
+
+                    if (!withdrawal) {
+                        return res.sendStatus(200);
+                    }
+
+                    // If this payment has already been verified maybe either by callbackUrl or webhook prevent re-run wen page is refreshed
+                    if (withdrawal.status === "Confirmed") {
+
+                        return res.status(StatusCodes.OK);
+                    }
+                    event.data.amount = event.data.amount / 100
+
+                    withdrawal.status = 'Confirmed'
+                    withdrawal.paymentStatus = event.data.status
+
+                    let userWallet = await SavingsWallet.findOne({ user: withdrawal.user })
+                    // Refund withdrawn amount to user wallet
+                    userWallet.categories.map(item => {
+                        if (item.category === withdrawal.category) {
+                            item.amount += withdrawal.amount
+                            return item
+                        } else {
+                            return item
+                        }
+                    })
+
+                    await Transfer.findOneAndUpdate(
+                        { item: withdrawal._id },
+                        {
+                            $set: {
+                                status: event.data.status,
+                                transferData: event.data,
+                            },
+                        }
+                    ).exec();
+                    await userWallet.save()
+                    await withdrawal.save();
+
+                    // Use Promise.all to wait for both promises to resolve
+                    // await Promise.all([updateTransferPromise, updateWithdrawalPromise, saveWallet]);
+                    return res.sendStatus(200);
+                }
             }
 
         } else {

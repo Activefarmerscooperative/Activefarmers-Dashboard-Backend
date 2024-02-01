@@ -130,17 +130,15 @@ exports.createTransferRecip = async (account_name, account_number, bank_code) =>
   return data;
 };
 
-
-
 exports.initiateTransfer = async (amount, recipient_code, reference, reason) => {
-  console.log(recipient_code, reference)
+
   const params = {
     "source": "balance",
     "amount": amount * 100,
     "reference": `${reference}`,
     "recipient": `${recipient_code}`,
     // reference,
-    "reason": reason ? reason : "Transfer made from my Wallet Account",
+    "reason": reason,
 
   }
 

@@ -9,9 +9,10 @@ const savingsWithdrawalSchema = mongoose.Schema({
     category: { type: String, required: true, },
     status: {
         type: String,
-        enum: ['Pending', 'Confirmed', "Rejected"],
+        enum: ['Pending', "In Progress", 'Confirmed', "Rejected"],
         default: 'Pending'
     },
+    paymentStatus: { type: String, },
     adminActionBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
     rejectionReason: {
         type: String,

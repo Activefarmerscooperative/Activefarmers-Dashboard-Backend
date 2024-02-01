@@ -94,7 +94,7 @@ router.put('/withdrawal/:id/approval', auth, adminController.handleWithdrawalApp
 
 router.get('/transfer-requests', auth, adminController.transferRequests)
 
-router.put('/loan/:id/payment', auth, adminController.handlePaymentTransfer)
+// router.put('/loan/:id/payment', auth, adminController.handlePaymentTransfer)
 
 router.get('/auto-transactions', auth, adminController.cronJobs)
 

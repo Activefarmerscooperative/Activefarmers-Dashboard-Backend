@@ -5,7 +5,7 @@ const payoutSchema = mongoose.Schema({
     amount: { type: Number },
     admin: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'Admin' },
     payment_method: { type: String },
-    reference: { type: String },
+    reference: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'Transfer' },
     item: { type: mongoose.Schema.Types.ObjectId, required: true, refPath: 'checkModel' },
     checkModel: {
         type: String,
