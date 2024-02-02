@@ -52,7 +52,18 @@ exports.registerAdmin = async (req, res) => {
         status: "success",
 
     });
+}
 
+exports.confirmAdminAFCSToken = async (req, res) => {
+    const admin = req.user
+
+    if (admin.adminType !== "Super-Admin" && admin.adminType !== "Admin") {
+        return res.status(StatusCodes.UNAUTHORIZED).json({ error: "Un-Authorized" });
+    }
+    return res.status(StatusCodes.OK).json({
+        status: 'success',
+        admin: req.user
+    });
 }
 
 exports.verify_token = async (req, res) => {
@@ -612,7 +623,6 @@ exports.handleLoanApproval = async (req, res) => {
         loan.status = "In Progress"
 
         const response = await initiateTransfer(loan.amount, data.recipient_code, loan._id, "Loan")
-        console.log(response)
 
         if (response.status === false) {
             return res.status(StatusCodes.UNPROCESSABLE_ENTITY).json({
@@ -640,7 +650,11 @@ exports.handleLoanApproval = async (req, res) => {
             item: loan._id,
             checkModel: "Loan"
         })
-        await Promise.all([transferRecipient.save({ session }), loan.save({ session }), payout.save()]);
+
+        await transferRecipient.save({ session })
+        await loan.save({ session })
+        await payout.save({ session })
+        // await Promise.all([transferRecipient.save({ session }), loan.save({ session }), payout.save()]);
 
         await session.commitTransaction();
         session.endSession();
