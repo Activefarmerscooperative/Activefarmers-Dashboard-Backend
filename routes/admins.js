@@ -23,6 +23,7 @@ router.post('/', validate(validateAdmin), adminController.registerAdmin);
 // Verify OTP
 router.put('/', auth, adminController.verify_token);
 
+router.get('/token', auth, adminController.confirmAdminAFCSToken);
 //resend phone verification code
 router.post('/resend-verification', auth, adminController.resend_otp)
 

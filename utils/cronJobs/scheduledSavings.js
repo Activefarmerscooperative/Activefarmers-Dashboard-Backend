@@ -10,6 +10,7 @@ const SavingsCardDetails = require('../../models/savingsCardDetails');
 const generateUniqueId = require('generate-unique-id');
 const Savings = require("../../models/savings");
 const SavingsWallet = require('../../models/savingsWallet');
+
 const scheduledSavingsDeduction = async () => {
 
     try {
@@ -84,7 +85,7 @@ const scheduledSavingsDeduction = async () => {
                             _id: new mongoose.Types.ObjectId(),
                             user: savings.user,
                             amount: savings.amount,
-                            status:"Confirmed",
+                            status: "Confirmed",
                             category: savings.category,
                             reference: refID
                         })
@@ -105,11 +106,11 @@ const scheduledSavingsDeduction = async () => {
 
                         let cronNotification = new CronNotification({
                             user: savings.user,
-                            amount:savings.amount,
+                            amount: savings.amount,
                             type: "SavingsDeduction",
                             status: "Successful",
-                            PaymentMethod:"Paystack",
-                            reference:data.reference,
+                            PaymentMethod: "Paystack",
+                            reference: data.reference,
                             message: "Savings deducted successfully",
                             item: savings._id,
                             checkModel: "ScheduledSavings"
@@ -127,7 +128,7 @@ const scheduledSavingsDeduction = async () => {
                     savings.cronStatus = "Failed"
                     let cronNotification = new CronNotification({
                         user: savings.user,
-                        amount:savings.amount,
+                        amount: savings.amount,
                         type: "SavingsDeduction",
                         status: "Failed",
                         message: "Payment transaction failed.",
