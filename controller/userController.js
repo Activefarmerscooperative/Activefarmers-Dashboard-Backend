@@ -170,7 +170,24 @@ exports.loginUser = async (req, res) => {
   let user = await User.findOne({ phone: req.body.phone });
   if (!user) return res.status(400).json({ error: 'Invalid Credentials.' });
 
-  if (!user.isVerified) return res.status(400).json({ error: 'Please contact AFCS admin to verify your account.' });
+  if (!user.isVerified) {
+    const result = await Register_OTP(req.body.phone)
+    const token = user.generateAuthToken();
+    return res
+      .status(StatusCodes.PERMANENT_REDIRECT).json({
+        status: "success",
+        message: `Enter the verification code sent to ${user.phone} in order to verify your account`,
+        pinId: result?.pinId || null,
+        afcsToken: token
+        //Result is the response from the OTP SERVICE. 
+        // Sample Data. Note pinId is required to verify OTP
+        //  {
+        //   "pinId": "29ae67c2-c8e1-4165-8a51-8d3d7c298081",
+        //   "to": "2348109077743",
+        //   "smsStatus": "Message Sent"
+        // }
+      });
+  }
 
   const validPassword = await bcrypt.compare(req.body.password, user.password);
   if (!validPassword) return res.status(400).json({ error: 'Invalid credentials' });
