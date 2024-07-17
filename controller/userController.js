@@ -172,6 +172,7 @@ exports.loginUser = async (req, res) => {
 
   if (!user.isVerified) {
     const result = await Register_OTP(req.body.phone)
+    console.log(result)
     const token = user.generateAuthToken();
     return res
       .status(StatusCodes.PERMANENT_REDIRECT).json({
