@@ -15,7 +15,7 @@ require("./startup/cors.js")(app);
 require("./startup/db")();
 
 
-cron.schedule('*/10 * * * *', () => {
+cron.schedule('*/5 * * * *', () => {
   console.log("Running every hour");
   test_Cron()
   // scheduledSavingsDeduction();
