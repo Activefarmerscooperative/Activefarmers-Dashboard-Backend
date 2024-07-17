@@ -15,9 +15,19 @@ require("./startup/cors.js")(app);
 require("./startup/db")();
 
 
-cron.schedule('0 * * * *', () => {
-  console.log("Running every hour");
-  test_Cron()
+cron.schedule('5 0 * * *', () => {
+  console.log("Running at 12:05 AM every day");
+  test_Cron();
+});
+
+cron.schedule('5 1 * * *', () => {
+  console.log("Running at 1:05 AM every day");
+  test_Cron();
+});
+
+cron.schedule('5 2 * * *', () => {
+  console.log("Running at 2:05 AM every day");
+  test_Cron();
 });
 // cron.schedule('0 2 * * *', () => {
 //   console.log("Running at 2 AM every day");
