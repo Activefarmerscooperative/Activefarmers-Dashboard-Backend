@@ -14,7 +14,6 @@ app.use(morgan('tiny'));
 require("./startup/cors.js")(app);
 require("./startup/db")();
 
-
 cron.schedule('5 0 * * *', () => {
   console.log("Running at 12:05 AM every day");
   test_Cron();
