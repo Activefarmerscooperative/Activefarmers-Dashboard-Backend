@@ -15,12 +15,10 @@ require("./startup/cors.js")(app);
 require("./startup/db")();
 
 
-cron.schedule('*/20 * * * *', () => {
+cron.schedule('0 * * * *', () => {
   console.log("Running every hour");
   test_Cron()
-  // scheduledSavingsDeduction();
 });
-
 // cron.schedule('0 2 * * *', () => {
 //   console.log("Running at 2 AM every day");
 //   loanDeduction();
