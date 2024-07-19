@@ -15,6 +15,21 @@ exports.Register_OTP = async (phone) => {
         "message_text": "Your AFCS Verification pin is < 1234 >",
         "pin_type": "NUMERIC",
         "api_key": TERMII_API_KEY,
+
+        // "to": phone,
+        // "message_type": "NUMERIC",
+        // // "from": "Qwique",
+        // "from": "N-Alert",
+        // "channel": "dnd",
+        // "pin_attempts": 10,
+        // "pin_time_to_live": 10,
+        // "pin_length": 6,
+        // "pin_placeholder": "< 1234 >",
+        // // "message_text": "Your Qwique Verification pin is < 1234 >",
+        // "message_text": "Your AFCS Verification code is < 1234 >. It expires in 10 minutes.",
+
+        // "pin_type": "NUMERIC",
+        // "api_key": TERMII_API_KEY,
     };
     try {
         const response = await axios.post('https://api.ng.termii.com/api/sms/otp/send', data);

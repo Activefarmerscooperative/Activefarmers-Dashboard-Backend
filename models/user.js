@@ -122,8 +122,6 @@ const userSchema = new mongoose.Schema({
     },
     workLevel: {
       type: String,
-      minlength: 5,
-      maxlength: 1024
     },
     companyName: {
       type: String,

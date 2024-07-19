@@ -16,6 +16,7 @@ const scheduledSavingsDeduction = async () => {
     try {
         const currentDayOfMonth = new Date().getDate();
 
+
         const scheduledSavings = await ScheduledSavings.find({
             scheduledDate: currentDayOfMonth
         });
@@ -93,14 +94,15 @@ const scheduledSavingsDeduction = async () => {
                         // Increase value in user wallet by deducted amount
                         let updateSavings = await SavingsWallet.findOne({ user: savings.user })
 
-                        updateSavings.categories.map(item => {
-                            if (item.category === savings.category) {
-                                item.amount += savings.amount
-                                return item
-                            } else {
-                                return item
-                            }
-                        })
+                        if (updateSavings) {
+                            updateSavings.categories.forEach(item => {
+                                if (item.category === savings.category) {
+                                    item.amount += savings.amount;
+                                }
+                            });
+
+                            await updateSavings.save();
+                        }
 
                         savings.cronStatus = "Successful"
 

@@ -170,9 +170,9 @@ exports.loginUser = async (req, res) => {
   let user = await User.findOne({ phone: req.body.phone });
   if (!user) return res.status(400).json({ error: 'Invalid Credentials.' });
 
+
   if (!user.isVerified) {
     const result = await Register_OTP(req.body.phone)
-    console.log(result)
     const token = user.generateAuthToken();
     return res
       .status(StatusCodes.PERMANENT_REDIRECT).json({
@@ -194,13 +194,12 @@ exports.loginUser = async (req, res) => {
   if (!validPassword) return res.status(400).json({ error: 'Invalid credentials' });
 
   const token = user.generateAuthToken();
-  const result = await Register_OTP(req.body.phone)
+  // const result = await Register_OTP(req.body.phone)
 
   res.status(StatusCodes.OK).json({
     status: "Success",
     message: "User Login Successfull",
-    token,
-    result
+    token
   }
 
   );
