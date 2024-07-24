@@ -51,6 +51,10 @@ router.get('/token', auth, adminController.confirmAFCSToken);
 
 router.get('/members', auth, adminController.getMembers);
 
+router.get('/unverified-members', auth, adminController.getUnverifiedMembers);
+
+router.put('/verify/:id', auth, adminController.verifyUnverifiedMember);
+
 router.get('/borrowers', auth, adminController.getBorrowers);
 
 router.get('/members-count', auth, adminController.getMembersCount);

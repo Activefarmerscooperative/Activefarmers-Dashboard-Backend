@@ -366,6 +366,66 @@ exports.getMembers = async (req, res) => {
         .exec();
     res.status(StatusCodes.OK).json(users);
 }
+
+exports.getUnverifiedMembers = async (req, res) => {
+    const users = await User.find({ isVerified: false })
+        .select("-password -resetPassword -resendOTP")
+        .populate("location", "_id name")
+        // .sort({ createdAt: -1 })
+        .exec();
+    res.status(StatusCodes.OK).json(users);
+}
+
+exports.verifyUnverifiedMember = async (req, res) => {
+    const { id } = req.params
+    const { action } = req.query
+
+    if (action !== "approved") {
+        const user = await User.findByIdAndUpdate(id, {
+            $set: {
+                regCompletePercent: 50,
+                isVerified: false,
+                verifiedBy: `${req.user.surname} ${req.user.firstname}`
+            }
+        }, { new: true })
+
+        return res.status(StatusCodes.OK).json({ message: 'User Rejection Successful!' })
+    }
+
+    const user = await User.findByIdAndUpdate(id, {
+        $set: {
+            regCompletePercent: 50,
+            isVerified: true,
+            verifiedBy: `${req.user.surname} ${req.user.firstname}`
+        }
+    }, { new: true })
+
+    // Create a savings wallet for the user.
+    const savingsCategories = await SavingsCategory.find().exec()
+    let categories = [];
+    for (let i = 0; i < savingsCategories.length; i++) {
+        categories.push({
+            category: savingsCategories[i].name,
+            amount: 0,
+        })
+    }
+
+    const userSavingsWallet = new SavingsWallet({
+        _id: new mongoose.Types.ObjectId(),
+        user: user._id,
+        categories
+    })
+    await userSavingsWallet.save()
+
+    const notifyAdmin = new AdminNotification({
+        user: user._id,
+        type: "Registration"
+    })
+
+    await notifyAdmin.save()
+    return res.status(StatusCodes.OK).json({ message: 'User Verification successful!' })
+}
+
 exports.getMembersCount = async (req, res) => {
     const users = await User.countDocuments({ isVerified: true })
         .exec();

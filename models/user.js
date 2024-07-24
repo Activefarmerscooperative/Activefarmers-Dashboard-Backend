@@ -154,6 +154,10 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  verifiedBy: {
+    type: String,
+    default: "OTP"
+  },
   regCompletePercent: {
     type: Number,
     default: 25,

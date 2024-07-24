@@ -9,7 +9,7 @@ const { Loan } = require("../models/loan")
 const { BankDetails } = require("../models/accountDetails");
 const Transaction = require("../models/transaction");
 const StatusCodes = require("../utils/status-codes")
-const { Otp_VerifyAccount, Otp_ForgotPassword } = require("../utils/sendMail")
+const { Otp_VerifyAccount, Otp_ForgotPassword, New_User } = require("../utils/sendMail")
 const _ = require("lodash");
 const bcrypt = require("bcrypt");
 const otpGenerator = require("otp-generator");
@@ -24,6 +24,7 @@ const cloudinary = require("../utils/cloudinary");
 const { ScheduledSavings } = require("../models/scheduledSavings");
 const SavingsCardDetails = require("../models/savingsCardDetails");
 const AdminNotification = require("../models/adminNotification");
+const { Admin } = require("../models/admin");
 
 exports.getUser = async (req, res) => {
   const user = await User.findById(req.user._id)
@@ -88,6 +89,34 @@ exports.registerUser = async (req, res) => {
   const token = user.generateAuthToken();
 
   const result = await Register_OTP(user.phone)
+
+  // n
+  const superAdmins = await Admin.find({ adminType: "Super-Admin" })
+    .select("email")
+  // Get the total number of admins
+  const totalAdmins = await Admin.countDocuments({ adminType: "Admin" });
+
+  // If there are less than 2 admins, adjust the count to avoid errors
+  const maxSkip = Math.max(0, totalAdmins - 2);
+
+  // Generate a random skip value
+  const randomSkip = Math.floor(Math.random() * (maxSkip + 1));
+
+  // Fetch two random admins with the random skip
+  const admins = await Admin.find({ adminType: "Admin" })
+    .select("email")
+    .skip(randomSkip)
+    .limit(2);
+
+  // Combine the emails into a single array
+  const emails = [
+    ...superAdmins.map(admin => admin.email),
+    ...admins.map(admin => admin.email)
+  ];
+
+
+  // notify admin
+  await New_User(emails, `${user.firstname} ${user.surname}`)
 
 
   res
