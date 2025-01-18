@@ -4,7 +4,7 @@ const paymentController = require("../controller/paymentController")
 
 //GET index page. 
 router.get('/', function (req, res) {
-    res.json('Hello! welcome to KAELO');
+    res.json('Hello! welcome to AFCS');
 });
 
 router.post('/', paymentController.validatePaymentByWebhook);
