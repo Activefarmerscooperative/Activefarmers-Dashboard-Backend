@@ -21,6 +21,12 @@ cron.schedule('5 0 * * *', () => {
   scheduledSavingsDeduction();
 });
 
+cron.schedule('0 * * * *', () => {
+  console.log("Running at the start of every hour");
+  // Add any function calls you want to execute every hour here
+  test_Cron();
+});
+
 cron.schedule('5 2 * * *', () => {
   console.log("Running at 2 AM every day");
   loanDeduction();

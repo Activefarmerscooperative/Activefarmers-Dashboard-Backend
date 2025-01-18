@@ -19,7 +19,7 @@ exports.test_Cron = async () => {
       from: "activefarmersinfo@gmail.com",
       to: "jossyojih@gmail.com",
       subject: ' Active Farmers testin Cron',
-      html: ` <b> Hi Joe </b></br>
+      html: ` <b> Hi Joe I just ran a cron job</b></br>
         <p>Please enter this code to verify your Active Farmers Cooperative Service Account.</p>
         </br>
         </br>
