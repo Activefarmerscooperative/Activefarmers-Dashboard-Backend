@@ -10,8 +10,6 @@ exports.validate = (validator) => {
 exports.loginValidator = function (req) {
     const schema = Joi.object({
         phone: Joi.string()
-            .pattern(new RegExp(/[1-9]\d{1,14}$/))
-            .message('Please enter a valid phone number in international format')
             .required(),
         password: Joi.string()
             .min(5)

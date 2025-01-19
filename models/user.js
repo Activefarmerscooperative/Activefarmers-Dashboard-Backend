@@ -218,8 +218,6 @@ function validateUser(user) {
       .max(250)
       .required(),
     phone: Joi.string()
-      .pattern(new RegExp(/[1-9]\d{1,14}$/))
-      .message('Please enter a valid phone number in international format')
       .required(),
     isoCode: Joi.string()
       .pattern(new RegExp(/^\+[1-9]\d{1,14}$/))
@@ -268,8 +266,6 @@ function validateUserUpdate(user) {
       .max(250)
       .required(),
     phone: Joi.string()
-      .pattern(new RegExp(/[1-9]\d{1,14}$/))
-      .message('Please enter a valid phone number in international format')
       .required(),
     email: Joi.string()
       .email()
@@ -332,8 +328,6 @@ function validateGuarantor(guarantor) {
       .max(1000)
       .required(),
     phone: Joi.string()
-      .pattern(new RegExp(/^\+[1-9]\d{1,14}$/))
-      .message('Please enter a valid phone number in international format')
       .required(),
     email: Joi.string()
       .min(5)

@@ -13,6 +13,7 @@ module.exports = function (req, res, next) {
         req.user = decoded;
         next();
     } catch (ex) {
+        console.log(ex)
         res.status(StatusCodes.UNAUTHORIZED).json({ error: "Session ended. Please Login" });
     }
 };

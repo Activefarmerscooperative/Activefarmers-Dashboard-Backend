@@ -196,7 +196,9 @@ exports.confirmAFCSToken = async (req, res) => {
 }
 
 exports.loginUser = async (req, res) => {
+  console.log(req.body)
   let user = await User.findOne({ phone: req.body.phone });
+  console.log(user)
   if (!user) return res.status(400).json({ error: 'Invalid Credentials.' });
 
 
@@ -353,11 +355,7 @@ exports.guarantor_details = async (req, res) => {
   };
 
   if (user.regCompletePercent < 100 && !user.guarantor?.full_name) {
-    if (user.membershipType !== "Farmer") {
-      updateFields.regCompletePercent = user.regCompletePercent + 20;
-    } else {
-      updateFields.regCompletePercent = user.regCompletePercent + 10;
-    }
+    updateFields.regCompletePercent = user.regCompletePercent + 20;
 
   }
 
