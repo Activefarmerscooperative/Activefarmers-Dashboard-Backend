@@ -49,7 +49,7 @@ const loanSchema = mongoose.Schema({
     repaymentStatus: {
         type: String,
         default: "Ongoing",
-        enum: ["Ongoing", "Completed"]
+        enum: ["Ongoing", "Completed","Canceled"]
         //Ongoing when the user has not completed loan payment
         //Completed when payment has been completed and Loan closed
     },

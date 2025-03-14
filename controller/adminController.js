@@ -630,6 +630,7 @@ exports.handleLoanRejection = async (req, res) => {
         $set: {
             status: "Rejected",
             adminActionBy: req.user._id,
+            repaymentStatus:"Canceled",
             rejectionReason: rejectionReason
         }
     }, {
@@ -735,6 +736,7 @@ exports.handleWithdrawalRejection = async (req, res) => {
     const withdrawal = await SavingsWithdrawal.findByIdAndUpdate(req.params.id, {
         $set: {
             status: "Rejected",
+            repaymentStatus: "Canceled",
             adminActionBy: req.user._id,
             rejectionReason
         }
@@ -764,6 +766,7 @@ exports.handleWithdrawalApproval = async (req, res) => {
 
     const hasLoan = await Loan.findOne({
         user: withdrawal.user,
+        status: "Confirmed",
         repaymentStatus: { $ne: "Completed" }
     });
 
@@ -812,7 +815,7 @@ exports.handleWithdrawalApproval = async (req, res) => {
     withdrawal.status = "In Progress"
 
     const response = await initiateTransfer(withdrawal.amount, data.recipient_code, withdrawal._id, "Withdrawal")
-
+    console.log(response)
     if (response.status === false) {
         return res.status(StatusCodes.UNPROCESSABLE_ENTITY).json({
             status: "failed",
@@ -820,7 +823,7 @@ exports.handleWithdrawalApproval = async (req, res) => {
         });
     }
 
-    if (response.data.status !== "success") {
+    if (response.data.status !== "success" && response.data.status !== "pending") {
         return res.status(StatusCodes.UNPROCESSABLE_ENTITY).json({
             status: "failed",
             error: "Cannot complete transaction. Something went wrong.",
@@ -850,15 +853,16 @@ exports.handleWithdrawalApproval = async (req, res) => {
         }
     })
 
-    await userWallet.save()
-    await transferRecipient.save()
-    await withdrawal.save()
-    await payout.save()
+    await Promise.all([
+        userWallet.save(),
+        transferRecipient.save(),
+        withdrawal.save(),
+        payout.save()
+    ]);
 
     return res.status(StatusCodes.OK).json({
         status: 'success',
         message: 'Withdrawal Request approved successfully.',
-
     });
 }
 

@@ -826,6 +826,7 @@ exports.savings_withdrawal = async (req, res) => {
 
   const hasLoan = await Loan.findOne({
     user: req.user,
+    status: "Confirmed",
     repaymentStatus: { $ne: "Completed" }
   });
 
@@ -1146,9 +1147,10 @@ exports.loan_request = async (req, res) => {
     user: req.user._id,
     $or: [
       { status: 'Pending' },
-      { repaymentStatus: { $in: ['Ongoing', 'Failed'] } }
+      { repaymentStatus: { $in: ['Ongoing'] } }
     ]
   }).exec()
+
 
   if (hasLoan.length > 0) return res.status(StatusCodes.BAD_REQUEST).json({
     status: "failed",

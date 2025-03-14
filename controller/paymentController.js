@@ -143,7 +143,7 @@ exports.validatePayment = async (req, res) => {
 }
 
 exports.validatePaymentByWebhook = async (req, res, next) => {
-    console.log("yeah")
+
     try {
         const hash = crypto.createHmac('sha512', process.env.PAYSTACK_SECRET_KEY).update(JSON.stringify(req.body)).digest('hex');
 
